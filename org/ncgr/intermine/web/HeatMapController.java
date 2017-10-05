@@ -13,9 +13,10 @@ package org.ncgr.intermine.web;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.LinkedList;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -46,9 +47,9 @@ import org.intermine.web.logic.session.SessionMethods;
 import org.json.JSONObject;
 
 /**
- * Class that generates heatMap data for a list of genes.
- * It is assumed that only one expression series is in the database - all ExpressionSample records are queried for the list of conditions.
- * Based on the modmine HeatMapController written by Sergio and Fengyuan Hu, but heavily modified.
+ * Class that generates CanvasXpress heat map data for a list of genes.
+ *
+ * Originally based on the modmine HeatMapController written by Sergio and Fengyuan Hu, but heavily modified.
  *
  * @author Sam Hokin
  *
@@ -80,111 +81,148 @@ public class HeatMapController extends TilesAction {
             // it ain't genes, bail
             return null;
         }
-        
-        // query the conditions, put them in a list
-        List<String> conditions = new ArrayList<String>();
-        PathQuery conditionsQuery = queryConditions(model);
-        ExportResultsIterator conditionsResult;
+
+        // query the sources, since we may have more than one, put them in a list of JSONs
+        List<String> sources = new LinkedList<String>();
+        List<String> sourcesJSON = new LinkedList<String>();
+        PathQuery sourcesQuery = querySources(model);
+        ExportResultsIterator sourcesResult;
         try {
-            conditionsResult = executor.execute(conditionsQuery);
+            sourcesResult = executor.execute(sourcesQuery);
         } catch (ObjectStoreException e) {
-            LOG.error("Error retrieving conditions: "+e.getMessage());
-            throw new RuntimeException("Error retrieving conditions.", e);
+            throw new RuntimeException("Error retrieving sources.", e);
         }
-        while (conditionsResult.hasNext()) {
-            List<ResultElement> row = conditionsResult.next();
+        while (sourcesResult.hasNext()) {
+            List<ResultElement> row = sourcesResult.next();
             if (row==null || row.get(0)==null || row.get(0).getField()==null) {
-                LOG.error("Null row or row element returned while retrieving conditions.");
-                throw new RuntimeException("Null row or row element retrieving conditions.");
+                throw new RuntimeException("Null row or row element retrieving samples.");
             } else {
-                conditions.add((String) row.get(0).getField());
+                // grab the fields
+                Integer id = (Integer)row.get(0).getField();
+                String primaryIdentifier = (String)row.get(1).getField();
+                String description = (String)row.get(2).getField();
+                String unit = (String)row.get(3).getField();
+                // load out stuff
+                Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
+                jsonMap.put("id", id);
+                jsonMap.put("primaryIdentifier", primaryIdentifier);
+                jsonMap.put("description", description);
+                jsonMap.put("unit", unit);
+                sources.add(primaryIdentifier);
+                sourcesJSON.add(new JSONObject(jsonMap).toString());
             }
         }
-        // if no conditions return an empty JSON string and bail
-        if (conditions.size()==0) {
-            request.setAttribute("expressionValueJSON", "{}");
-            LOG.error("No expression conditions retrieved.");
-            return null;
-        }
 
-        // set up the expression values query
-        PathQuery valuesQuery = queryExpressionValuesFromGenes(model, bag);
-        LOG.info(valuesQuery.toXml());
+        // now loop over the sources to get samples and expression
+        // we'll store the JSON blocks in a string list, as well as a list of sample counts
+        List<String> expressionJSON = new LinkedList<String>();
+        List<Integer> geneCounts = new LinkedList<Integer>();
+        List<Integer> sampleCounts = new LinkedList<Integer>();
+
+        for (String source : sources) {
             
-        // Key: Gene.primaryIdentifier; Value: list of ExpressionValue objs
-        Map<String, List<ExpressionValue>> expressionValueMap = new LinkedHashMap<String, List<ExpressionValue>>();
-        ExportResultsIterator valuesResult;
-        try {
-            valuesResult = executor.execute(valuesQuery);
-        } catch (ObjectStoreException e) {
-            LOG.error("Error retrieving expression values: "+e.getMessage());
-            throw new RuntimeException("Error retrieving expression values.", e);
-        }
-        while (valuesResult.hasNext()) {
-            List<ResultElement> row = valuesResult.next();
-            String primaryIdentifier = (String) row.get(0).getField();
-            Integer num = (Integer) row.get(1).getField();
-            String condition = (String) row.get(2).getField();
-            Double value = (Double) row.get(3).getField();
-            ExpressionValue aScore = new ExpressionValue(condition, num, value, primaryIdentifier);
-            if (!expressionValueMap.containsKey(primaryIdentifier)) {
-                // Create a list with space for n (size of conditions) ExpressionValue
-                List<ExpressionValue> expressionValueList = new ArrayList<ExpressionValue>(Collections.nCopies(conditions.size(), new ExpressionValue()));
-                expressionValueList.set(conditions.indexOf(condition), aScore);
-                expressionValueMap.put(primaryIdentifier, expressionValueList);
-            } else {
-                expressionValueMap.get(primaryIdentifier).set(conditions.indexOf(condition), aScore);
+            // query the samples for this source, put them in a list
+            List<String> samples = new LinkedList<String>();
+            PathQuery samplesQuery = querySamples(model, source);
+            ExportResultsIterator samplesResult;
+            try {
+                samplesResult = executor.execute(samplesQuery);
+            } catch (ObjectStoreException e) {
+                throw new RuntimeException("Error retrieving samples.", e);
             }
-        }
-        // if no expression values return an empty JSON string
-        if (expressionValueMap.size()==0) {
-            request.setAttribute("expressionValueJSON", "{}");
-            LOG.error("No expression values retrieved.");
-            return null;
-        }
-
-        // canvasXpress "smps" = genes
-        List<String> smps =  new ArrayList<String>(expressionValueMap.keySet());
-        double[][] data = new double[smps.size()][conditions.size()];
-        for (int i=0; i<smps.size(); i++) {
-            String sequenceFeature = smps.get(i);
-            for (int j=0; j<conditions.size(); j++) {
-                if (expressionValueMap.get(sequenceFeature)!=null && expressionValueMap.get(sequenceFeature).get(j)!=null && expressionValueMap.get(sequenceFeature).get(j).getValue()!=null) {
-                    data[i][j] = (double) expressionValueMap.get(sequenceFeature).get(j).getValue();
+            while (samplesResult.hasNext()) {
+                List<ResultElement> row = samplesResult.next();
+                if (row==null || row.get(0)==null || row.get(0).getField()==null) {
+                    throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    data[i][j] = 0.0;
+                    samples.add((String) row.get(0).getField());
                 }
             }
-        }
-            
-        // Rotate data
-        double[][] rotatedData = new double[conditions.size()][smps.size()];
-        int ii = 0;
-        for (int i=0; i<conditions.size(); i++) {
-            int jj = 0;
-            for (int j=0; j<smps.size(); j++) {
-                rotatedData[ii][jj] = data[j][i];
-                jj++;
+
+            // if no samples return an empty JSON string and bail
+            if (samples.size()==0) {
+                request.setAttribute("expressionValueJSON", "{}");
+                return null;
             }
-            ii++;
+            
+            // set up the expression values query
+            PathQuery valuesQuery = queryExpressionValues(model, source, bag);
+            LOG.info(valuesQuery.toXml());
+            
+            // load the expression values for this source into a map, keyed by gene, containing a list of ExpressionValue objects
+            Map<String, List<ExpressionValue>> expressionValueMap = new LinkedHashMap<String, List<ExpressionValue>>();
+            ExportResultsIterator valuesResult;
+            try {
+                valuesResult = executor.execute(valuesQuery);
+            } catch (ObjectStoreException e) {
+                LOG.error("Error retrieving expression values: "+e.getMessage());
+                throw new RuntimeException("Error retrieving expression values.", e);
+            }
+            while (valuesResult.hasNext()) {
+                List<ResultElement> row = valuesResult.next();
+                String geneID = (String) row.get(0).getField();
+                Integer num = (Integer) row.get(1).getField();
+                String sample = (String) row.get(2).getField();
+                Double value = (Double) row.get(3).getField();
+                ExpressionValue expValue = new ExpressionValue(sample, num, value, geneID);
+                if (!expressionValueMap.containsKey(geneID)) {
+                    // Create a new list with space for n (size of samples) ExpressionValues
+                    List<ExpressionValue> expressionValueList = new ArrayList<ExpressionValue>(Collections.nCopies(samples.size(), new ExpressionValue()));
+                    expressionValueList.set(samples.indexOf(sample), expValue);
+                    expressionValueMap.put(geneID, expressionValueList);
+                } else {
+                    // Gene already here, update the value of this sample
+                    expressionValueMap.get(geneID).set(samples.indexOf(sample), expValue);
+                }
+            }
+
+            // if no expression values return an empty JSON string
+            if (expressionValueMap.size()==0) {
+                request.setAttribute("expressionValueJSON", "{}");
+                LOG.error("No expression values retrieved.");
+                return null;
+            }
+
+            // canvasXpress "smps" = genes
+            List<String> genes =  new ArrayList<String>(expressionValueMap.keySet());
+
+            // canvasXpress "data" = double[samples][genes]
+            double[][] data = new double[samples.size()][genes.size()];
+            for (int j=0; j<genes.size(); j++) {
+                String gene = genes.get(j);
+                for (int i=0; i<samples.size(); i++) {
+                    if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null && expressionValueMap.get(gene).get(i).getValue()!=null) {
+                        data[i][j] = (double) expressionValueMap.get(gene).get(i).getValue();
+                    } else {
+                        data[i][j] = 0.0;
+                    }
+                }
+            }
+            
+            // put the data into a JSONObject
+            Map<String, Object> yInHeatmapData =  new LinkedHashMap<String, Object>();
+            yInHeatmapData.put("vars", samples);
+            yInHeatmapData.put("smps", genes);
+            yInHeatmapData.put("data", data);
+
+            // the entire JSON data is called "y" by CanvasXpress
+            Map<String, Object> heatmapData = new LinkedHashMap<String, Object>();
+            heatmapData.put("y", yInHeatmapData);
+            JSONObject jo = new JSONObject(heatmapData);
+
+            // add these results to the results maps
+            geneCounts.add(genes.size());
+            sampleCounts.add(samples.size());
+            expressionJSON.add(jo.toString());
+
         }
 
-        // put the data into the JSONObject
-        Map<String, Object> yInHeatmapData =  new LinkedHashMap<String, Object>();
-        yInHeatmapData.put("vars", conditions);
-        yInHeatmapData.put("smps", smps);
-        yInHeatmapData.put("data", rotatedData);
-
-        Map<String, Object> heatmapData = new LinkedHashMap<String, Object>();
-        heatmapData.put("y", yInHeatmapData);
-            
-        // the JSON data
-        JSONObject jo = new JSONObject(heatmapData);
-
-        // set the attributes
-        request.setAttribute("expressionValueJSON", jo.toString());
-        request.setAttribute("FeatureCount", smps.size());
-        request.setAttribute("ConditionCount", conditions.size());
+        // set the return attributes
+        request.setAttribute("sources", sources);
+        request.setAttribute("sourcesJSON", sourcesJSON);
+        request.setAttribute("geneCounts", geneCounts);
+        request.setAttribute("sampleCounts", sampleCounts);
+        request.setAttribute("expressionJSON", expressionJSON);
 
         return null;
     }
@@ -203,27 +241,45 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve the conditions = ExpressionSample.primaryIdentifier.
+     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.primaryIdentifier.
      *
      * @param model the model
      * @return the path query
      */
-    private PathQuery queryConditions(Model model) {
+    private PathQuery querySources(Model model) {
         PathQuery query = new PathQuery(model);
-        // query ALL samples
-        query.addViews("ExpressionSample.primaryIdentifier");
+        query.addView("ExpressionSource.id");                 // 0
+        query.addView("ExpressionSource.primaryIdentifier");  // 1  
+        query.addView("ExpressionSource.description");        // 2
+        query.addView("ExpressionSource.unit");               // 3
+        query.addOrderBy("ExpressionSource.primaryIdentifier", OrderDirection.ASC);
+        return query;
+    }
+
+    /**
+     * Create a path query to retrieve the samples = ExpressionSample.primaryIdentifier for a given source.
+     *
+     * @param model the model
+     * @param source the primaryIdentifier of the expression source
+     * @return the path query
+     */
+    private PathQuery querySamples(Model model, String source) {
+        PathQuery query = new PathQuery(model);
+        query.addView("ExpressionSample.primaryIdentifier");
+        query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
     }
 
     /**
-     * Create a path query to retrieve gene expression values from a bag of genes.
+     * Create a path query to retrieve gene expression values from a bag of genes for the given expression source.
      *
-     * @param model the model
-     * @param bag   the bag of genes from which to get the mRNA IDs, etc.
+     * @param model  the model
+     * @param source the primaryIdentifier of the ExpressionSource
+     * @param bag    the bag o'genes
      * @return the path query
      */
-    private PathQuery queryExpressionValuesFromGenes(Model model, InterMineBag bag) {
+    private PathQuery queryExpressionValues(Model model, String source, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
         // Add views
         query.addViews(
@@ -236,6 +292,7 @@ public class HeatMapController extends TilesAction {
         query.addOrderBy("Gene.primaryIdentifier", OrderDirection.ASC);
         query.addOrderBy("Gene.expressionValues.sample.num", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
+        query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.in("Gene", bag.getName()));
         query.addConstraint(Constraints.isNotNull("Gene.expressionValues.value"));
         return query;

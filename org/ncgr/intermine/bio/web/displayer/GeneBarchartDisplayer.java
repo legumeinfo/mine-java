@@ -30,7 +30,7 @@ import org.intermine.web.logic.results.ReportObject;
 import org.json.JSONObject;
 
 /**
- * Display a single-row barchart of expression for a single gene.
+ * Display expression bar charts for a single gene.
  *
  * @author Sam Hokin
  */
@@ -65,6 +65,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         // query the sources, since we may have more than one, put them in a list of JSONs
         List<String> sources = new LinkedList<String>();
         List<String> sourcesJSON = new LinkedList<String>();
+        Map<String,String> sourcesUnit = new LinkedHashMap<String,String>();
         PathQuery sourcesQuery = querySources(model);
         ExportResultsIterator sourcesResult;
         try {
@@ -75,44 +76,51 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         while (sourcesResult.hasNext()) {
             List<ResultElement> row = sourcesResult.next();
             if (row==null || row.get(0)==null || row.get(0).getField()==null) {
-                throw new RuntimeException("Null row or row element retrieving conditions.");
+                throw new RuntimeException("Null row or row element retrieving samples.");
             } else {
+                // grab the fields
+                Integer id = (Integer)row.get(0).getField();
+                String primaryIdentifier = (String)row.get(1).getField();
+                String description = (String)row.get(2).getField();
+                String unit = (String)row.get(3).getField();
+                // load out stuff
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
-                jsonMap.put("id", (Integer)row.get(0).getField());
-                jsonMap.put("primaryIdentifier", (String)row.get(1).getField());
-                jsonMap.put("description",(String)row.get(2).getField());
-                jsonMap.put("unit",(String)row.get(3).getField());
-                sources.add((String)row.get(1).getField());
+                jsonMap.put("id", id);
+                jsonMap.put("primaryIdentifier", primaryIdentifier);
+                jsonMap.put("description", description);
+                jsonMap.put("unit", unit);
+                sources.add(primaryIdentifier);
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
+                sourcesUnit.put(primaryIdentifier, unit);
             }
         }
 
-        // now loop over the sources to get conditions and expression
-        // we'll store the JSON blocks in a string list, as well as a list of condition counts
+        // now loop over the sources to get samples and expression
+        // we'll store the JSON blocks in a string list
         List<String> jsonList = new LinkedList<String>();
-        List<Integer> countsList = new LinkedList<Integer>();
 
         for (String source : sources) {
             
-            // query the conditions for this source, put them in a list
-            List<String> conditions = new LinkedList<String>();
-            PathQuery conditionsQuery = queryConditions(model, source);
-            ExportResultsIterator conditionsResult;
+            // query the samples for this source, put them in a list
+            List<String> samples = new LinkedList<String>();
+            PathQuery samplesQuery = querySamples(model, source);
+            ExportResultsIterator samplesResult;
             try {
-                conditionsResult = executor.execute(conditionsQuery);
+                samplesResult = executor.execute(samplesQuery);
             } catch (ObjectStoreException e) {
-                throw new RuntimeException("Error retrieving conditions.", e);
+                throw new RuntimeException("Error retrieving samples.", e);
             }
-            while (conditionsResult.hasNext()) {
-                List<ResultElement> row = conditionsResult.next();
+            while (samplesResult.hasNext()) {
+                List<ResultElement> row = samplesResult.next();
                 if (row==null || row.get(0)==null || row.get(0).getField()==null) {
-                    throw new RuntimeException("Null row or row element retrieving conditions.");
+                    throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    conditions.add((String) row.get(0).getField());
+                    samples.add((String) row.get(0).getField());
                 }
             }
-            // if no conditions return an empty JSON string and bail
-            if (conditions.size()==0) {
+
+            // if no samples return an empty JSON string and bail
+            if (samples.size()==0) {
                 request.setAttribute("expressionValueJSON", "{}");
                 return;
             }
@@ -129,18 +137,23 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             while (valuesResult.hasNext()) {
                 List<ResultElement> row = valuesResult.next();
                 Integer num = (Integer) row.get(0).getField();        // 0 Gene.expressionValues.sample.num
-                String condition = (String) row.get(1).getField();    // 1 Gene.expressionValues.sample.primaryIdentifier
+                String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.primaryIdentifier
                 Double value = (Double) row.get(2).getField();        // 2 Gene.expressionValues.value
-                ExpressionValue eval = new ExpressionValue(condition, num, value, geneID);
+                ExpressionValue eval = new ExpressionValue(sample, num, value, geneID);
                 expressionValues.add(eval);
             }
 
             // canvasXpress "vars" = gene (just one)
-            // canvasXpress "smps" = conditions
             List<String> vars = new LinkedList<String>();
             vars.add(geneID);
-            double[][] data = new double[1][conditions.size()];
-            for (int j=0; j<conditions.size(); j++) {
+            
+            // canvasXpress "desc" = unit (just one)
+            List<String> desc = new LinkedList<String>();
+            desc.add(sourcesUnit.get(source));
+
+            // canvasXpress "data"
+            double[][] data = new double[1][samples.size()];
+            for (int j=0; j<samples.size(); j++) {
                 if (expressionValues.get(j)!=null) {
                     data[0][j] = (double) expressionValues.get(j).getValue();
                 } else {
@@ -148,16 +161,11 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 }
             }
             
-            // // Rotate data
-            // double[][] rotatedData = new double[conditions.size()][1];
-            // for (int i=0; i<conditions.size(); i++) {
-            //     rotatedData[i][0] = data[0][i];
-            // }
-
             // put the data into the JSONObject
             Map<String, Object> yInBarchartData =  new LinkedHashMap<String, Object>();
             yInBarchartData.put("vars", vars);
-            yInBarchartData.put("smps", conditions);
+            yInBarchartData.put("smps", samples);
+            yInBarchartData.put("desc", desc);
             yInBarchartData.put("data", data);
             
             Map<String, Object> barchartData = new LinkedHashMap<String, Object>();
@@ -169,16 +177,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             // add this JSON to the list of JSONs
             jsonList.add(jo.toString());
 
-            // add the condition count to the list of counts
-            countsList.add(conditions.size());
-            
         }
 
         // set the return attributes
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
-        request.setAttribute("countsList", countsList);
 
     }
 
@@ -199,13 +203,13 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve the conditions = ExpressionSample.primaryIdentifier.
+     * Create a path query to retrieve the samples = ExpressionSample.primaryIdentifier.
      *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
      * @return the path query
      */
-    private PathQuery queryConditions(Model model, String source) {
+    private PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
