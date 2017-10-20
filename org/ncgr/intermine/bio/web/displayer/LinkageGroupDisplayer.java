@@ -105,18 +105,22 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
         for (Integer lgID : lgMap.keySet()) {
             
             // LINKAGE GROUP TRACK
+            // the data
+            List<ResultElement> lgRow = lgMap.get(lgID);
+            int lgId = (int) (Integer) lgRow.get(0).getField();
+            String lgPrimaryId = (String) lgRow.get(1).getField();
+            double[] length = new double[2];
+            length[0] = 0.0;
+            length[1] = (double) (Double) lgRow.get(2).getField();
+            // the track
             Map<String,Object> lgTrack = new LinkedHashMap<String,Object>();
             lgTrack.put("type", "box");
             // linkage group track data array
             List<Object> lgDataArray = new LinkedList<Object>();
             // the single data item
             Map<String,Object> lgData = new LinkedHashMap<String,Object>();
-            List<ResultElement> lgRow = lgMap.get(lgID);
-            double[] length = new double[2];
-            length[0] = 0.0;
-            length[1] = (double) (Double) lgRow.get(2).getField();
-            lgData.put("id", (Integer) lgRow.get(1).getField());
-            lgData.put("key", (int)lgID);
+            lgData.put("id", lgPrimaryId);
+            lgData.put("key", lgId); // for linking
             lgData.put("fill", "purple");
             lgData.put("outline", "black");
             // linkage group box positions = array of one pair
@@ -134,11 +138,15 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             List<Object> markersDataArray = new LinkedList<Object>();
             Map<Integer,List<ResultElement>> markers = markerMap.get(lgID);
             for (Integer markerID : markers.keySet()) {
+                // the data
                 List<ResultElement> markerRow = markers.get(markerID);
+                int markerId = (int) (Integer) markerRow.get(0).getField();
+                String markerPrimaryId = (String) markerRow.get(1).getField();
                 double position = (double) (Double) markerRow.get(2).getField();
+                // the track data
                 Map<String,Object> markerData = new LinkedHashMap<String,Object>();
-                markerData.put("id", (String) markerRow.get(1).getField()); // canvasXpress needs it to be called "id"
-                markerData.put("key", (int)markerID); // we'll call the id "key" for linking purposes
+                markerData.put("id", markerPrimaryId);
+                markerData.put("key", markerId); // for linking
                 markerData.put("fill", "darkred");
                 markerData.put("outline", "black");
                 markerData.put("offset", position);
@@ -154,13 +162,17 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             List<Object> qtlsDataArray = new LinkedList<Object>();
             Map<Integer,List<ResultElement>> qtls = qtlMap.get(lgID);
             for (Integer qtlID : qtls.keySet()) {
+                // the data
                 List<ResultElement> qtlRow = qtls.get(qtlID);
+                int qtlId = (int) (Integer) qtlRow.get(0).getField();
+                String qtlPrimaryId = (String) qtlRow.get(1).getField();
                 double[] span = new double[2];
                 span[0] = (double) (Double) qtlRow.get(2).getField();
                 span[1] = (double) (Double) qtlRow.get(3).getField();
+                // the track data
                 Map<String,Object> qtlData = new LinkedHashMap<String,Object>();
-                qtlData.put("id", (String) qtlRow.get(1).getField()); // canvasXpress needs it to be called "id"
-                qtlData.put("key", (int)qtlID); // we'll call the id "key" for linking purposes
+                qtlData.put("id", qtlPrimaryId); // canvasXpress needs it to be called "id"
+                qtlData.put("key", qtlId); // for linking
                 qtlData.put("fill", "yellow");
                 qtlData.put("outline", "black");
                 // QTL box positions = array of one pair
@@ -196,7 +208,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
     PathQuery getLinkageGroupQuery(Model model, int reportID, String objectName) {
         PathQuery query = new PathQuery(model);
         query.addViews("LinkageGroup.id",
-                       "LinkageGroup.number",
+                       "LinkageGroup.primaryIdentifier",
                        "LinkageGroup.length"
                        );
         if (objectName.equals("GeneticMap")) {

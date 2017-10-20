@@ -143,6 +143,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 expressionValues.add(eval);
             }
 
+            // if no expression values for this gene return an empty JSON string and bail
+            if (expressionValues.size()==0) {
+                request.setAttribute("expressionValueJSON", "{}");
+                return;
+            }
+            
             // canvasXpress "vars" = gene (just one)
             List<String> vars = new LinkedList<String>();
             vars.add(geneID);
