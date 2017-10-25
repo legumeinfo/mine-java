@@ -98,11 +98,14 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         // now loop over the sources to get samples and expression
         // we'll store the JSON blocks in a string list
         List<String> jsonList = new LinkedList<String>();
+        // and the sample descriptions in another list
+        List<String> descriptionsList = new LinkedList<String>();
 
         for (String source : sources) {
             
             // query the samples for this source, put them in a list
             List<String> samples = new LinkedList<String>();
+            Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
             PathQuery samplesQuery = querySamples(model, source);
             ExportResultsIterator samplesResult;
             try {
@@ -115,7 +118,10 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 if (row==null || row.get(0)==null || row.get(0).getField()==null) {
                     throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    samples.add((String) row.get(0).getField());
+                    String sample = (String) row.get(0).getField();
+                    String description = (String) row.get(1).getField();
+                    samples.add(sample);
+                    sampleDescriptions.put(sample, description);
                 }
             }
 
@@ -167,7 +173,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 }
             }
             
-            // put the data into the JSONObject
+            // put the canvasXpress data into the JSONObject
             Map<String, Object> yInBarchartData =  new LinkedHashMap<String, Object>();
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
@@ -183,12 +189,17 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             // add this JSON to the list of JSONs
             jsonList.add(jo.toString());
 
+            // add the the sample descriptions to the list
+            JSONObject descriptionsJSON = new JSONObject(sampleDescriptions);
+            descriptionsList.add(descriptionsJSON.toString());
+
         }
 
         // set the return attributes
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
+        request.setAttribute("descriptionsList", descriptionsList);
 
     }
 
@@ -218,6 +229,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     private PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
+        query.addView("ExpressionSample.description");
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
