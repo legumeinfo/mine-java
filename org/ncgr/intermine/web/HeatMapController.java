@@ -113,13 +113,19 @@ public class HeatMapController extends TilesAction {
             }
         }
 
-        // now loop over the sources to get samples and expression
-        // we'll store the JSON blocks in a string list, as well as a list of sample counts
+        // we'll store the JSON blocks in a string list, as well as a list of sample counts and description maps
         List<String> expressionJSON = new LinkedList<String>();
         List<Integer> geneCounts = new LinkedList<Integer>();
         List<Integer> sampleCounts = new LinkedList<Integer>();
 
+        // this is a list of maps
+        List<Map<String,String>> descriptionsList = new LinkedList<Map<String,String>>();
+
+        // now loop over the sources to get samples and expression
         for (String source : sources) {
+
+            // store sample descriptions in a map
+            Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
             
             // query the samples for this source, put them in a list
             List<String> samples = new LinkedList<String>();
@@ -135,7 +141,10 @@ public class HeatMapController extends TilesAction {
                 if (row==null || row.get(0)==null || row.get(0).getField()==null) {
                     throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    samples.add((String) row.get(0).getField());
+                    String sample = (String) row.get(0).getField();
+                    String description = (String) row.get(1).getField();
+                    samples.add(sample);
+                    sampleDescriptions.put(sample, description);
                 }
             }
 
@@ -215,6 +224,9 @@ public class HeatMapController extends TilesAction {
             sampleCounts.add(samples.size());
             expressionJSON.add(jo.toString());
 
+            // add the the sample descriptions to the list
+            descriptionsList.add(sampleDescriptions);
+
         }
 
         // set the return attributes
@@ -223,6 +235,7 @@ public class HeatMapController extends TilesAction {
         request.setAttribute("geneCounts", geneCounts);
         request.setAttribute("sampleCounts", sampleCounts);
         request.setAttribute("expressionJSON", expressionJSON);
+        request.setAttribute("descriptionsList", descriptionsList);
 
         return null;
     }
@@ -257,7 +270,7 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve the samples = ExpressionSample.primaryIdentifier for a given source.
+     * Create a path query to retrieve the sample primaryIdentifiers and descriptions for a given source.
      *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
@@ -266,6 +279,7 @@ public class HeatMapController extends TilesAction {
     private PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
+        query.addView("ExpressionSample.description");
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
