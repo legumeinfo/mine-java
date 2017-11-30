@@ -66,7 +66,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         List<String> sources = new LinkedList<String>();
         List<String> sourcesJSON = new LinkedList<String>();
         Map<String,String> sourcesUnit = new LinkedHashMap<String,String>();
-        PathQuery sourcesQuery = querySources(model);
+        PathQuery sourcesQuery = querySources(model, geneID);
         ExportResultsIterator sourcesResult;
         try {
             sourcesResult = executor.execute(sourcesQuery);
@@ -102,7 +102,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         List<String> descriptionsList = new LinkedList<String>();
 
         for (String source : sources) {
-            
+
             // query the samples for this source, put them in a list
             List<String> samples = new LinkedList<String>();
             Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
@@ -204,18 +204,20 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.primaryIdentifier.
+     * Create a path query to retrieve expression sources associated with the given gene, alphabetically by ExpressionSource.primaryIdentifier.
      *
      * @param model the model
+     * @param geneID the gene for which sources are queried
      * @return the path query
      */
-    private PathQuery querySources(Model model) {
+    private PathQuery querySources(Model model, String geneID) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSource.id");                 // 0
-        query.addView("ExpressionSource.primaryIdentifier");  // 1  
-        query.addView("ExpressionSource.description");        // 2
-        query.addView("ExpressionSource.unit");               // 3
-        query.addOrderBy("ExpressionSource.primaryIdentifier", OrderDirection.ASC);
+        query.addView("Gene.expressionValues.sample.source.id");                 // 0
+        query.addView("Gene.expressionValues.sample.source.primaryIdentifier");  // 1
+        query.addView("Gene.expressionValues.sample.source.description");        // 2
+        query.addView("Gene.expressionValues.sample.source.unit");               // 3
+        query.addConstraint(Constraints.eq("Gene.primaryIdentifier", geneID));
+        query.addOrderBy("Gene.expressionValues.sample.source.primaryIdentifier", OrderDirection.ASC);
         return query;
     }
 

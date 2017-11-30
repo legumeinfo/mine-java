@@ -85,7 +85,7 @@ public class HeatMapController extends TilesAction {
         // query the sources, since we may have more than one, put them in a list of JSONs
         List<String> sources = new LinkedList<String>();
         List<String> sourcesJSON = new LinkedList<String>();
-        PathQuery sourcesQuery = querySources(model);
+        PathQuery sourcesQuery = querySources(model, bag);
         ExportResultsIterator sourcesResult;
         try {
             sourcesResult = executor.execute(sourcesQuery);
@@ -254,18 +254,22 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.primaryIdentifier.
+     * Create a path query to retrieve expression sources for the genes in the bag, alphabetically by ExpressionSource.primaryIdentifier.
      *
      * @param model the model
+     * @param bag   the bag o'genes
      * @return the path query
      */
-    private PathQuery querySources(Model model) {
+    private PathQuery querySources(Model model, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSource.id");                 // 0
-        query.addView("ExpressionSource.primaryIdentifier");  // 1  
-        query.addView("ExpressionSource.description");        // 2
-        query.addView("ExpressionSource.unit");               // 3
-        query.addOrderBy("ExpressionSource.primaryIdentifier", OrderDirection.ASC);
+
+
+        query.addView("Gene.expressionValues.sample.source.id");                 // 0
+        query.addView("Gene.expressionValues.sample.source.primaryIdentifier");  // 1
+        query.addView("Gene.expressionValues.sample.source.description");        // 2
+        query.addView("Gene.expressionValues.sample.source.unit");               // 3
+        query.addConstraint(Constraints.in("Gene", bag.getName()));
+        query.addOrderBy("Gene.expressionValues.sample.source.primaryIdentifier", OrderDirection.ASC);
         return query;
     }
 
