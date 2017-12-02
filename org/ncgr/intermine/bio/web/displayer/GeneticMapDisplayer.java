@@ -59,8 +59,8 @@ public class GeneticMapDisplayer extends ReportDisplayer {
 
         // get the linkage groups and find the maximum length
         double maxLGLength = 0.0;
-        Map<String,Double> lgMap = new LinkedHashMap<String,Double>();
-        PathQuery lgQuery = queryLinkageGroup(im.getModel(), gmPI);
+        Map<Integer,LinkageGroup> lgMap = new LinkedHashMap<Integer,LinkageGroup>();
+        PathQuery lgQuery = queryLinkageGroups(im.getModel(), gmPI);
         ExportResultsIterator lgResult;
         try {
             lgResult = executor.execute(lgQuery);
@@ -69,57 +69,65 @@ public class GeneticMapDisplayer extends ReportDisplayer {
         }
         while (lgResult.hasNext()) {
             List<ResultElement> row = lgResult.next();
-            String primaryIdentifier = (String) row.get(0).getField();
-            Double length = (Double) row.get(1).getField();
-            lgMap.put(primaryIdentifier, length);
+            int id = (int) (Integer) row.get(0).getField();
+            String primaryIdentifier = (String) row.get(1).getField();
+            double length = (double) (Double) row.get(2).getField();
+            LinkageGroup lg = new LinkageGroup(id, primaryIdentifier, length);
+            lgMap.put(id, lg);
             if ((double)length > maxLGLength) maxLGLength = (double)length;
         }
 
         // get the genetic markers per linkage group
-        Map<String, Map<String,Double>> markerMap = new LinkedHashMap<String, Map<String,Double>>();
-        for (String lgPI : lgMap.keySet()) {
-            PathQuery markerQuery = queryGeneticMarker(im.getModel(), lgPI);
+        Map<Integer, Map<Integer,GeneticMarker>> markerMap = new LinkedHashMap<Integer, Map<Integer,GeneticMarker>>();
+        for (Integer lgID : lgMap.keySet()) {
+            PathQuery markerQuery = queryGeneticMarkers(im.getModel(), lgID);
             ExportResultsIterator markerResult;
             try {
                 markerResult = executor.execute(markerQuery);
             } catch (ObjectStoreException e) {
                 throw new RuntimeException("Error retrieving data.", e);
             }
-            Map<String,Double> markers = new LinkedHashMap<String,Double>();
+            Map<Integer,GeneticMarker> markers = new LinkedHashMap<Integer,GeneticMarker>();
             while (markerResult.hasNext()) {
                 List<ResultElement> row = markerResult.next();
-                String primaryIdentifier = (String) row.get(0).getField();
-                Double position = (Double) row.get(1).getField();
-                markers.put(primaryIdentifier, position);
+                int id = (int) (Integer) row.get(0).getField();
+                String primaryIdentifier = (String) row.get(1).getField();
+                double position = (double) (Double) row.get(2).getField();
+                GeneticMarker marker = new GeneticMarker(id, primaryIdentifier, position);
+                markers.put(id, marker);
             }
-            markerMap.put(lgPI, markers);
+            markerMap.put(lgID, markers);
         }
 
         // get the QTLs per linkage group
-        Map<String, Map<String,Double[]>> qtlMap = new LinkedHashMap<String, Map<String,Double[]>>();
-        for (String lgPI : lgMap.keySet()) {
-            PathQuery qtlQuery = queryQTL(im.getModel(), lgPI);
+        Map<Integer, Map<Integer,QTL>> qtlMap = new LinkedHashMap<Integer, Map<Integer,QTL>>();
+        for (Integer lgID : lgMap.keySet()) {
+            PathQuery qtlQuery = queryQTLs(im.getModel(), lgID);
             ExportResultsIterator qtlResult;
             try {
                 qtlResult = executor.execute(qtlQuery);
             } catch (ObjectStoreException e) {
                 throw new RuntimeException("Error retrieving data.", e);
             }
-            Map<String,Double[]> qtls = new LinkedHashMap<String,Double[]>();
+            Map<Integer,QTL> qtls = new LinkedHashMap<Integer,QTL>();
             while (qtlResult.hasNext()) {
                 List<ResultElement> row = qtlResult.next();
-                String primaryIdentifier = (String) row.get(0).getField();
-                Double[] span = new Double[2];
-                span[0] = (Double) row.get(1).getField();
-                span[1] = (Double) row.get(2).getField();
-                qtls.put(primaryIdentifier, span);
+                int id = (int) (Integer) row.get(0).getField();
+                String primaryIdentifier = (String) row.get(1).getField();
+                double[] span = new double[2];
+                span[0] = (double) (Double) row.get(2).getField();
+                span[1] = (double) (Double) row.get(3).getField();
+                QTL qtl = new QTL(id, primaryIdentifier, span);
+                qtls.put(id, qtl);
             }
-            qtlMap.put(lgPI, qtls);
+            qtlMap.put(lgID, qtls);
         }
 
         // JSON data - non-labeled array - order matters!
         List<Object> trackData = new LinkedList<Object>();
-        for (String lgPI : lgMap.keySet()) {
+        for (Integer lgID : lgMap.keySet()) {
+
+            LinkageGroup lg = lgMap.get(lgID);
             
             // LINKAGE GROUP TRACK
             Map<String,Object> lgTrack = new LinkedHashMap<String,Object>();
@@ -128,14 +136,15 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             List<Object> lgDataArray = new LinkedList<Object>();
             // the single data item
             Map<String,Object> lgData = new LinkedHashMap<String,Object>();
-            lgData.put("id", lgPI);
+            lgData.put("id", lg.primaryIdentifier);
+            lgData.put("key", lg.id); // for linking
             lgData.put("fill", "purple");
             lgData.put("outline", "black");
             // linkage group box positions = array of one pair
             List<Object> lgPositionsArray = new LinkedList<Object>();
             double[] length = new double[2];
             length[0] = 0.0;
-            length[1] = (double) lgMap.get(lgPI);
+            length[1] = lg.length;
             lgPositionsArray.add(length);
             lgData.put("data", lgPositionsArray);
             lgDataArray.add(lgData);
@@ -147,13 +156,15 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             markersTrack.put("type", "triangle");
             // markers track data array
             List<Object> markersDataArray = new LinkedList<Object>();
-            Map<String,Double> markers = markerMap.get(lgPI);
-            for (String markerPI : markers.keySet()) {
+            Map<Integer,GeneticMarker> markers = markerMap.get(lgID);
+            for (Integer markerID : markers.keySet()) {
+                GeneticMarker marker = markers.get(markerID);
                 Map<String,Object> markerData = new LinkedHashMap<String,Object>();
-                markerData.put("id", markerPI);
+                markerData.put("id", marker.primaryIdentifier);
+                markerData.put("key", marker.id); // for linking
                 markerData.put("fill", "darkred");
                 markerData.put("outline", "black");
-                markerData.put("offset", markers.get(markerPI));
+                markerData.put("offset", marker.position);
                 markersDataArray.add(markerData);
             }
             markersTrack.put("data", markersDataArray);
@@ -164,19 +175,17 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             qtlsTrack.put("type", "box");
             // QTLs track data array
             List<Object> qtlsDataArray = new LinkedList<Object>();
-            Map<String,Double[]> qtls = qtlMap.get(lgPI);
-            for (String qtlPI : qtls.keySet()) {
+            Map<Integer,QTL> qtls = qtlMap.get(lgID);
+            for (Integer qtlID : qtls.keySet()) {
+                QTL qtl = qtls.get(qtlID);
                 Map<String,Object> qtlData = new LinkedHashMap<String,Object>();
-                qtlData.put("id", qtlPI);
+                qtlData.put("id", qtl.primaryIdentifier);
+                qtlData.put("key", qtl.id); // for linking
                 qtlData.put("fill", "yellow");
                 qtlData.put("outline", "black");
                 // QTL box positions = array of one pair
                 List<Object> qtlPositionsArray = new LinkedList<Object>();
-                Double[] span = qtls.get(qtlPI);
-                double[] coords = new double[2];
-                coords[0] = (double) span[0];
-                coords[1] = (double) span[1];
-                qtlPositionsArray.add(coords);
+                qtlPositionsArray.add(qtl.span);
                 qtlData.put("data", qtlPositionsArray);
                 qtlsDataArray.add(qtlData);
             }
@@ -200,12 +209,14 @@ public class GeneticMapDisplayer extends ReportDisplayer {
      * Create a path query to retrieve linkage groups associated with a given genetic map.
      *
      * @param model the model
-     * @param gmPI  the genetic map primary identifier
+     * @param gmID  the genetic map primaryIdentifier
      * @return the path query
      */
-    private PathQuery queryLinkageGroup(Model model, String gmPI) {
+    private PathQuery queryLinkageGroups(Model model, String gmPI) {
         PathQuery query = new PathQuery(model);
-        query.addViews("LinkageGroup.primaryIdentifier",
+        query.addViews(
+                       "LinkageGroup.id",
+                       "LinkageGroup.primaryIdentifier",
                        "LinkageGroup.length"
                        );
         query.addConstraint(Constraints.eq("LinkageGroup.geneticMap.primaryIdentifier", gmPI));
@@ -217,15 +228,17 @@ public class GeneticMapDisplayer extends ReportDisplayer {
      * Create a path query to retrieve genetic markers associated with a given linkage group.
      *
      * @param model the model
-     * @param lgPI  the linkage group primaryIdentifier
+     * @param lgID  the linkage group id
      * @return the path query
      */
-    private PathQuery queryGeneticMarker(Model model, String lgPI) {
+    private PathQuery queryGeneticMarkers(Model model, int lgID) {
         PathQuery query = new PathQuery(model);
-        query.addViews("GeneticMarker.primaryIdentifier",
+        query.addViews(
+                       "GeneticMarker.id",
+                       "GeneticMarker.primaryIdentifier",
                        "GeneticMarker.linkageGroupPositions.position"
                        );
-        query.addConstraint(Constraints.eq("GeneticMarker.linkageGroupPositions.linkageGroup.primaryIdentifier", lgPI));
+        query.addConstraint(Constraints.eq("GeneticMarker.linkageGroupPositions.linkageGroup.id", String.valueOf(lgID)));
         query.addOrderBy("GeneticMarker.linkageGroupPositions.position", OrderDirection.ASC);
         return query;
     }
@@ -234,18 +247,62 @@ public class GeneticMapDisplayer extends ReportDisplayer {
      * Create a path query to retrieve QTLs associated with a given linkage group.
      *
      * @param model the model
-     * @param lgPI  the linkage group primaryIdentifier
+     * @param lgID  the linkage group id
      * @return the path query
      */
-    private PathQuery queryQTL(Model model, String lgPI) {
+    private PathQuery queryQTLs(Model model, int lgID) {
         PathQuery query = new PathQuery(model);
-        query.addViews("QTL.primaryIdentifier",
+        query.addViews(
+                       "QTL.id",
+                       "QTL.primaryIdentifier",
                        "QTL.linkageGroupRanges.begin",
                        "QTL.linkageGroupRanges.end"
                        );
-        query.addConstraint(Constraints.eq("QTL.linkageGroupRanges.linkageGroup.primaryIdentifier", lgPI));
+        query.addConstraint(Constraints.eq("QTL.linkageGroupRanges.linkageGroup.id", String.valueOf(lgID)));
         query.addOrderBy("QTL.linkageGroupRanges.begin", OrderDirection.ASC);
         return query;
+    }
+
+    /**
+     * A class to hold linkage group fields
+     */
+    public class LinkageGroup {
+        public int id;
+        public String primaryIdentifier;
+        public double length;
+        public LinkageGroup(int id, String primaryIdentifier, double length) {
+            this.id = id;
+            this.primaryIdentifier = primaryIdentifier;
+            this.length = length;
+        }
+    }
+
+    /**
+     * A class to hold genetic marker fields
+     */
+    public class GeneticMarker {
+        public int id;
+        public String primaryIdentifier;
+        public double position;
+        public GeneticMarker(int id, String primaryIdentifier, double position) {
+            this.id = id;
+            this.primaryIdentifier = primaryIdentifier;
+            this.position = position;
+        }
+    }
+
+    /**
+     * A class to hold QTL fields
+     */
+    public class QTL {
+        public int id;
+        public String primaryIdentifier;
+        public double[] span;
+        public QTL(int id, String primaryIdentifier, double[] span) {
+            this.id = id;
+            this.primaryIdentifier = primaryIdentifier;
+            this.span = span;
+        }
     }
 
 
