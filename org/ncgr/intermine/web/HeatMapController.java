@@ -76,9 +76,9 @@ public class HeatMapController extends TilesAction {
 
         // check that we've got a list of genes
         String expressionType = bag.getType();
-        LOG.info("called on a bag of type:"+expressionType);
         if (!expressionType.toLowerCase().equals("gene")) {
             // it ain't genes, bail
+            LOG.error("called on a bag of type:"+expressionType+", exiting.");
             return null;
         }
 
