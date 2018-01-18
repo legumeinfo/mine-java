@@ -46,6 +46,9 @@ import org.intermine.web.logic.session.SessionMethods;
 
 import org.json.JSONObject;
 
+import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+
 /**
  * Class that generates CanvasXpress heat map data for a list of genes.
  *
@@ -207,22 +210,72 @@ public class HeatMapController extends TilesAction {
                     }
                 }
             }
+
+            // // just summing expression across samples for now, to work on other stuff
+            // for (int j=0; j<genes.size(); j++) {
+            //     String gene = genes.get(j);
+            //     for (int i=0; i<samples.size(); i++) {
+            //         if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null && expressionValueMap.get(gene).get(i).getValue()!=null) {
+            //             values[j] += (double) expressionValueMap.get(gene).get(i).getValue();
+            //         }
+            //     }
+            // }
+
+            // analysis: calculate the mean Pearson's correlation coefficient of each gene with each other gene
+            PearsonsCorrelation pCorr = new PearsonsCorrelation();
+            Mean mean = new Mean();
+            double[] meanCorr = new double[genes.size()];
+            for (int j=0; j<genes.size(); j++) {
+                String gene1 = genes.get(j);
+                double[] values1 = new double[samples.size()];
+                for (int i=0; i<samples.size(); i++) {
+                    if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null && expressionValueMap.get(gene1).get(i).getValue()!=null) {
+                        values1[i] = (double) expressionValueMap.get(gene1).get(i).getValue();
+                    }
+                }
+                double totalCorr = 0.0;
+                int count = 0;
+                for (int k=0; k<genes.size(); k++) {
+                    if (j!=k) {
+                        String gene2 = genes.get(k);
+                        double[] values2 = new double[samples.size()];
+                        for (int i=0; i<samples.size(); i++) {
+                            if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null && expressionValueMap.get(gene2).get(i).getValue()!=null) {
+                                values2[i] = (double) expressionValueMap.get(gene2).get(i).getValue();
+                            }
+                        }
+                        double corr = pCorr.correlation(values1, values2);
+                        if (!Double.isNaN(corr)) {
+                            count++;
+                            totalCorr += corr;
+                        }
+                    }
+                }
+                if (count>0) meanCorr[j] = totalCorr/count;
+            }             
             
-            // put the data into a JSONObject
-            Map<String, Object> yInHeatmapData =  new LinkedHashMap<String, Object>();
+            // put the main heatmap data into a JSONObject for "y"
+            Map<String, Object> yInHeatmapData = new LinkedHashMap<String, Object>();
             yInHeatmapData.put("vars", samples);
             yInHeatmapData.put("smps", genes);
             yInHeatmapData.put("data", data);
 
-            // the entire JSON data is called "y" by CanvasXpress
+            // load analysis data into "x"
+            Map<String,Object> xInHeatmapData = new LinkedHashMap<String,Object>();
+            xInHeatmapData.put("PCorr", meanCorr);
+
+            // create the map that gets converted to the JSON object
             Map<String, Object> heatmapData = new LinkedHashMap<String, Object>();
+            heatmapData.put("x", xInHeatmapData);
             heatmapData.put("y", yInHeatmapData);
+
+            // convert to JSONObject and add to expressionJSON
             JSONObject jo = new JSONObject(heatmapData);
+            expressionJSON.add(jo.toString());
 
             // add these results to the results maps
             geneCounts.add(genes.size());
             sampleCounts.add(samples.size());
-            expressionJSON.add(jo.toString());
 
             // add the the sample descriptions to the list
             descriptionsList.add(sampleDescriptions);
