@@ -55,6 +55,7 @@ public class GenotypeDisplayer extends ReportDisplayer {
 
         int mpID = reportObject.getId();
         String mappingPopulation = (String) reportObject.getFieldValue("primaryIdentifier");
+        String matrixNotes = (String) reportObject.getFieldValue("matrixNotes");
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
         
@@ -104,6 +105,7 @@ public class GenotypeDisplayer extends ReportDisplayer {
 
         // output data to calling JSP
         request.setAttribute("mappingPopulation", mappingPopulation);
+        request.setAttribute("matrixNotes", matrixNotes);
         request.setAttribute("linkageGroups", linkageGroups);
         request.setAttribute("linkageGroupCounts", linkageGroupCounts);
         request.setAttribute("qtls", qtls);
