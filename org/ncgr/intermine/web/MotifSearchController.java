@@ -98,6 +98,8 @@ import org.ncgr.blast.Iteration;
 import org.ncgr.blast.SequenceHit;
 import org.ncgr.blast.SequenceHits;
 
+import org.ncgr.motifs.MotifSearchClient;
+
 /**
  * Run NCBI blastn on a bag of sequences, typically upstream intergenic regions, using methods provided in org.ncgr.blast and org.ncgr.opal, to find shared motifs.
  * Motifs will be displayed along with participating sequences on the calling widget.
@@ -131,8 +133,12 @@ public class MotifSearchController extends TilesAction {
     static final String SEQLOGO_SERVICE_URL = "http://intermine.ncgr.org/opal2/services/seqlogo";
     static final String LOGO_FILE = "alignment.png";
 
+    // MotifSearch servlet (for established motifs)
+    static final String MOTIF_SEARCH_URL = "http://intermine.ncgr.org/motifs/motifSearch"; // ?query=TATATA
+
     static DecimalFormat dec = new DecimalFormat("0.0000");
     static DecimalFormat rnd = new DecimalFormat("+00;-00");
+    static DecimalFormat perc = new DecimalFormat("00.0%");
 
     // alignment stuff
     static GapPenalty gapPenalty = new SimpleGapPenalty(GOP, GEP);
@@ -371,6 +377,18 @@ public class MotifSearchController extends TilesAction {
                     seqHitsData.put("num", seqHits.uniqueIDs.size());
                     seqHitsData.put("regions", new ArrayList(seqHits.uniqueHits));
                     seqHitsData.put("ids", new ArrayList(seqHits.uniqueIDs));
+                    // add a best-hit protein for our motif if it's logo-worthy
+                    if (addedToLogo) {
+                        MotifSearchClient msc = new MotifSearchClient(MOTIF_SEARCH_URL, seqHits.sequence);
+                        JSONObject bestHit = msc.getBestHitJSONObject();
+                        seqHitsData.put("bestHitName", bestHit.getString("name"));
+                        seqHitsData.put("bestHitScore", perc.format(bestHit.getDouble("score")/seqHits.sequence.length()));
+                        seqHitsData.put("bestHitBaseId", bestHit.getString("baseId")+"."+bestHit.getInt("version"));
+                    } else {
+                        seqHitsData.put("bestHitName", "");
+                        seqHitsData.put("bestHitScore", "");
+                        seqHitsData.put("bestHitBaseId", "");
+                    }
                     jsonList.add(seqHitsData);
                 }
 
