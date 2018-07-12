@@ -25,16 +25,13 @@ import org.apache.log4j.Logger;
 import org.apache.struts.action.ActionForm;
 import org.apache.struts.action.ActionForward;
 import org.apache.struts.action.ActionMapping;
-import org.biojava.bio.Annotation;
-import org.biojava.bio.seq.io.FastaFormat;
-import org.biojava.bio.seq.io.SeqIOTools;
-import org.biojava.bio.symbol.IllegalSymbolException;
-import org.biojava.utils.ChangeVetoException;
+
+import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
+import org.biojava.nbio.core.sequence.AccessionID;
+import org.biojava.nbio.core.sequence.io.FastaWriterHelper;
+import org.biojava.nbio.ontology.utils.SmallAnnotation;
+
 import org.intermine.api.InterMineAPI;
-import org.intermine.bio.web.biojava.BioSequence;
-import org.intermine.bio.web.biojava.BioSequenceFactory;
-import org.intermine.bio.web.biojava.BioSequenceFactory.SequenceType;
-import org.intermine.bio.web.export.ResidueFieldExporter;
 import org.intermine.model.InterMineObject;
 import org.intermine.model.bio.BioEntity;
 import org.intermine.model.bio.MRNA;
@@ -48,6 +45,11 @@ import org.intermine.web.logic.Constants;
 import org.intermine.web.logic.session.SessionMethods;
 import org.intermine.web.struts.InterMineAction;
 
+import org.intermine.bio.web.biojava.BioSequence;
+import org.intermine.bio.web.biojava.BioSequenceFactory;
+import org.intermine.bio.web.biojava.BioSequenceFactory.SequenceType;
+import org.intermine.bio.web.export.ResidueFieldExporter;
+
 /**
  * Exports sequence to be BLASTed by external service.
  *
@@ -58,6 +60,8 @@ public class SequenceBlastAction extends InterMineAction {
     
     @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(SequenceBlastAction.class);
+
+    private static final String PROPERTY_DESCRIPTIONLINE = "description_line";
 
     /**
      * This action is invoked directly to export SequenceFeatures.
@@ -80,62 +84,71 @@ public class SequenceBlastAction extends InterMineAction {
 
         //SequenceHttpExporter.setSequenceBlastHeader(response);
 
-        Properties webProps = (Properties) session.getServletContext().
-            getAttribute(Constants.WEB_PROPERTIES);
+        Properties webProps = (Properties) session.getServletContext(). getAttribute(Constants.WEB_PROPERTIES);
         Integer objectId = new Integer(request.getParameter("object"));
         InterMineObject obj = getObject(os, webProps, objectId);
 
         if (obj instanceof SequenceFeature || obj instanceof Protein) {
+            
             bioSequence = createBioSequence(obj);
             response.setContentType("text/html");
             if (bioSequence!=null) {
-                OutputStream out = response.getOutputStream();
-                out.write("<html>\n".getBytes("UTF-8"));
-                out.write("<head>\n".getBytes("UTF-8"));
-                out.write("<title>Send sequence to LIS BLAST service</title>\n".getBytes("UTF-8"));
-                out.write("</head>\n".getBytes("UTF-8"));
-                out.write("<body>\n".getBytes("UTF-8"));
-                out.write("<div style=\"width:550px; background-color:lightgray; margin:auto; padding:10px;\">\n".getBytes("UTF-8"));
-                out.write("<div style=\"width:450px; margin:auto; text-align:center;\">\n".getBytes("UTF-8"));
+                bioSequence.setAccession(new AccessionID((String)obj.getFieldValue("primaryIdentifier")));
+                OutputStream stream = response.getOutputStream();
+                PrintWriter out = new PrintWriter(stream);
+                out.write("<html>");
+                out.write("<head>");
+                out.write("<title>Send sequence to LIS BLAST service</title>");
+                out.write("</head>");
+                out.write("<body>");
+                out.write("<div style=\"width:550px; background-color:lightgray; margin:auto; padding:10px;\">");
+                out.write("<div style=\"width:450px; margin:auto; text-align:center;\">");
                 // the form
                 if (obj instanceof Protein) {
-                    out.write("<p>Send protein FASTA sequence to LIS BLAST</p>\n".getBytes("UTF-8"));
-                    out.write("<form class=\"blast-choice-form\" enctype=\"multipart/form-data\" action=\"https://legumeinfo.org/blast/protein/protein\" method=\"post\" id=\"blast-ui-per-blast-program-form\" accept-charset=\"UTF-8\">\n".getBytes("UTF-8"));
-                    out.write("<input name=\"blast_program\" value=\"blastp\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"query_type\" value=\"protein\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"db_type\" value=\"protein\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"form_build_id\" value=\"form-nbYZdNNzVdqbxBpGlg-fAvtXbYAMBSBcwOB60dmuZvc\" type=\"hidden\"/>\n".getBytes("UTF-8"));
+                    out.write("<p>Send protein FASTA sequence to LIS BLAST</p>");
+                    out.write("<form class=\"blast-choice-form\" enctype=\"multipart/form-data\" action=\"https://legumeinfo.org/blast/protein/protein\" method=\"post\" id=\"blast-ui-per-blast-program-form\" accept-charset=\"UTF-8\">");
+                    out.write("<input name=\"blast_program\" value=\"blastp\" type=\"hidden\"/>");
+                    out.write("<input name=\"query_type\" value=\"protein\" type=\"hidden\"/>");
+                    out.write("<input name=\"db_type\" value=\"protein\" type=\"hidden\"/>");
+                    out.write("<input name=\"form_build_id\" value=\"form-nbYZdNNzVdqbxBpGlg-fAvtXbYAMBSBcwOB60dmuZvc\" type=\"hidden\"/>");
                 } else {
-                    out.write("<p>Send nucleotide FASTA sequence to LIS BLAST</p>\n".getBytes("UTF-8"));
-                    out.write("<form class=\"blast-choice-form\" enctype=\"multipart/form-data\" action=\"https://legumeinfo.org/blast/nucleotide/nucleotide\" method=\"post\" id=\"blast-ui-per-blast-program-form\" accept-charset=\"UTF-8\">\n".getBytes("UTF-8"));
-                    out.write("<input name=\"blast_program\" value=\"blastn\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"query_type\" value=\"nucleotide\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"db_type\" value=\"nucleotide\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                    out.write("<input name=\"form_build_id\" value=\"form-_msVVwjZPwuh1T2b1Jfd6T38yo7RGxy-P-RLsCKhLec\" type=\"hidden\"/>\n".getBytes("UTF-8"));
+                    out.write("<p>Send nucleotide FASTA sequence to LIS BLAST</p>");
+                    out.write("<form class=\"blast-choice-form\" enctype=\"multipart/form-data\" action=\"https://legumeinfo.org/blast/nucleotide/nucleotide\" method=\"post\" id=\"blast-ui-per-blast-program-form\" accept-charset=\"UTF-8\">");
+                    out.write("<input name=\"blast_program\" value=\"blastn\" type=\"hidden\"/>");
+                    out.write("<input name=\"query_type\" value=\"nucleotide\" type=\"hidden\"/>");
+                    out.write("<input name=\"db_type\" value=\"nucleotide\" type=\"hidden\"/>");
+                    out.write("<input name=\"form_build_id\" value=\"form-_msVVwjZPwuh1T2b1Jfd6T38yo7RGxy-P-RLsCKhLec\" type=\"hidden\"/>");
                 }
-                out.write("<textarea id=\"edit-fasta\" name=\"FASTA\" cols=\"60\" rows=\"50\">\n".getBytes("UTF-8"));
-                SeqIOTools.writeFasta(out, bioSequence);
-                out.write("</textarea>\n".getBytes("UTF-8"));
-                out.write("<div>\n".getBytes("UTF-8"));
-                out.write("<input id=\"edit-submit\" name=\"op\" value=\" BLAST \" class=\"form-submit\" type=\"submit\"/>\n".getBytes("UTF-8"));
-                out.write("</div>\n".getBytes("UTF-8"));
-                out.write("<input name=\"form_id\" value=\"blast_ui_per_blast_program_form\" type=\"hidden\"/>\n".getBytes("UTF-8"));
-                out.write("</form>\n".getBytes("UTF-8"));
-                out.write("</div>\n".getBytes("UTF-8"));
-                out.write("</div>\n".getBytes("UTF-8"));
-                out.write("</body>\n".getBytes("UTF-8"));
-                out.write("</html>\n".getBytes("UTF-8"));
+                out.write("<textarea id=\"edit-fasta\" name=\"FASTA\" cols=\"60\" rows=\"50\">");
+                out.flush();
+                FastaWriterHelper.writeSequence(stream, bioSequence);
+                stream.flush();
+                out.write("</textarea>");
+                out.write("<div>");
+                out.write("<input id=\"edit-submit\" name=\"op\" value=\" BLAST \" class=\"form-submit\" type=\"submit\"/>");
+                out.write("</div>");
+                out.write("<input name=\"form_id\" value=\"blast_ui_per_blast_program_form\" type=\"hidden\"/>");
+                out.write("</form>");
+                out.write("</div>");
+                out.write("</div>");
+                out.write("</body>");
+                out.write("</html>");
+                out.flush();
             } else {
                 PrintWriter out = response.getWriter();
-                out.write("Sequence information not availble for this sequence feature...");
+                out.write("Sequence information not available for this sequence feature...");
                 out.flush();
             }
-        }
 
-        return null;
+	}
+
+	return null;
+
     }
 
-    private BioSequence createBioSequence(InterMineObject obj) throws IllegalSymbolException, IllegalAccessException, ChangeVetoException {
+    private BioSequence createBioSequence(InterMineObject obj)
+	throws IllegalAccessException, CompoundNotFoundException {
+
         BioSequence bioSequence;
         BioEntity bioEntity = (BioEntity) obj;
         if (obj instanceof Protein) {
@@ -146,7 +159,7 @@ public class SequenceBlastAction extends InterMineAction {
         if (bioSequence == null) {
             return null;
         }
-        Annotation annotation = bioSequence.getAnnotation();
+        SmallAnnotation annotation = bioSequence.getAnnotation();
         // try hard to find an identifier
         String identifier = bioEntity.getPrimaryIdentifier();
         if (identifier == null) {
@@ -165,7 +178,8 @@ public class SequenceBlastAction extends InterMineAction {
                 }
             }
         }
-        annotation.setProperty(FastaFormat.PROPERTY_DESCRIPTIONLINE, identifier);
+        annotation.setProperty(PROPERTY_DESCRIPTIONLINE, identifier);
+	
         return bioSequence;
     }
 

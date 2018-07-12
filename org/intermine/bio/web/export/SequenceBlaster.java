@@ -22,14 +22,12 @@ import java.util.Map;
 
 import org.apache.commons.collections.keyvalue.MultiKey;
 import org.apache.log4j.Logger;
-import org.biojava.bio.Annotation;
-import org.biojava.bio.seq.DNATools;
-import org.biojava.bio.seq.Sequence;
-import org.biojava.bio.seq.io.FastaFormat;
-import org.biojava.bio.seq.io.SeqIOTools;
-import org.biojava.bio.symbol.IllegalAlphabetException;
-import org.biojava.bio.symbol.IllegalSymbolException;
-import org.biojava.bio.symbol.SymbolList;
+import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
+import org.biojava.nbio.core.sequence.AccessionID;
+import org.biojava.nbio.core.sequence.DNASequence;
+import org.biojava.nbio.core.sequence.io.FastaWriterHelper;
+import org.biojava.nbio.core.sequence.template.AbstractSequence;
+import org.biojava.nbio.ontology.utils.SmallAnnotation;
 import org.intermine.api.config.ClassKeyHelper;
 import org.intermine.api.results.ResultElement;
 import org.intermine.bio.web.biojava.BioSequence;
@@ -51,14 +49,14 @@ import org.intermine.web.logic.export.ExportHelper;
 import org.intermine.web.logic.export.Exporter;
 
 /**
- * Export data in FASTA format and create a form POST to a BLAST service.
- * Select cell in each row that can be exported as a sequence and fetch associated sequence.
+ * Export data in FASTA format. Select cell in each row that can be exported as
+ * a sequence and fetch associated sequence.
  *
  * @author Kim Rutherford
  * @author Jakub Kulaviak
- * @author Sam Hokin
  **/
-public class SequenceBlaster implements Exporter {
+public class SequenceBlaster implements Exporter
+{
 
     private ObjectStore os;
     private OutputStream out;
@@ -71,17 +69,22 @@ public class SequenceBlaster implements Exporter {
     private static Map<MultiKey, String> chromosomeSequenceMap = new HashMap<MultiKey, String>();
     private List<Path> paths = Collections.emptyList();
     private static final Logger LOG = Logger.getLogger(SequenceBlaster.class);
+    private static final String PROPERTY_DESCRIPTIONLINE = "description_line";
 
     /**
      * Constructor.
      *
-     * @param os object store used for fetching sequence for exported object
-     * @param outputStream output stream
-     * @param featureIndex index of cell in row that contains object to be exported
+     * @param os
+     *            object store used for fetching sequence for exported object
+     * @param outputStream
+     *            output stream
+     * @param featureIndex
+     *            index of cell in row that contains object to be exported
      * @param classKeys for the model
      * @param extension extension
      */
-    public SequenceBlaster(ObjectStore os, OutputStream outputStream, int featureIndex, Map<String, List<FieldDescriptor>> classKeys, int extension) {
+    public SequenceBlaster(ObjectStore os, OutputStream outputStream,
+            int featureIndex, Map<String, List<FieldDescriptor>> classKeys, int extension) {
         this.os = os;
         this.out = outputStream;
         this.featureIndex = featureIndex;
@@ -92,14 +95,19 @@ public class SequenceBlaster implements Exporter {
     /**
      * Constructor.
      *
-     * @param os object store used for fetching sequence for exported object
-     * @param outputStream output stream
-     * @param featureIndex index of cell in row that contains object to be exported
+     * @param os
+     *            object store used for fetching sequence for exported object
+     * @param outputStream
+     *            output stream
+     * @param featureIndex
+     *            index of cell in row that contains object to be exported
      * @param classKeys for the model
      * @param extension extension
      * @param paths paths to include
      */
-    public SequenceBlaster(ObjectStore os, OutputStream outputStream, int featureIndex, Map<String, List<FieldDescriptor>> classKeys, int extension, List<Path> paths) {
+    public SequenceBlaster(ObjectStore os, OutputStream outputStream,
+            int featureIndex, Map<String, List<FieldDescriptor>> classKeys, int extension,
+            List<Path> paths) {
         this.os = os;
         this.out = outputStream;
         this.featureIndex = featureIndex;
@@ -122,12 +130,14 @@ public class SequenceBlaster implements Exporter {
     }
 
     /**
-     * {@inheritDoc}
-     * Lines are always separated with \n because third party tool writeFasta is used for writing sequence.
+     * {@inheritDoc} Lines are always separated with \n because third party tool
+     * writeFasta is used for writing sequence.
      */
     @Override
-    public void export(Iterator<? extends List<ResultElement>> resultIt, Collection<Path> unionPathCollection, Collection<Path> newPathCollection) {
-        // IDs of the features we have successfully output - used to avoid duplicates
+    public void export(Iterator<? extends List<ResultElement>> resultIt,
+            Collection<Path> unionPathCollection, Collection<Path> newPathCollection) {
+        // IDs of the features we have successfully output - used to avoid
+        // duplicates
         IntPresentSet exportedIDs = new IntPresentSet();
 
         try {
@@ -138,7 +148,7 @@ public class SequenceBlaster implements Exporter {
 
                 ResultElement resultElement = row.get(featureIndex);
 
-                Sequence bioSequence;
+                BioSequence bioSequence;
                 Object object = os.getObjectById(resultElement.getId());
                 if (!(object instanceof InterMineObject)) {
                     continue;
@@ -152,15 +162,16 @@ public class SequenceBlaster implements Exporter {
 
                 if (object instanceof SequenceFeature) {
                     if (extension > 0) {
-                        bioSequence = createSequenceFeatureWithExtension(header, object,
-                                                                         row, unionPathCollection, newPathCollection);
+                        bioSequence = createSequenceFeatureWithExtension(
+                                header, object,
+                                row, unionPathCollection, newPathCollection);
                     } else {
                         bioSequence = createSequenceFeature(header, object,
-                                                            row, unionPathCollection, newPathCollection);
+                                row, unionPathCollection, newPathCollection);
                     }
                 } else if (object instanceof Protein) {
                     bioSequence = createProtein(header, object, row,
-                                                unionPathCollection, newPathCollection);
+                            unionPathCollection, newPathCollection);
                 } else {
                     // ignore other objects
                     continue;
@@ -168,29 +179,29 @@ public class SequenceBlaster implements Exporter {
 
                 if (bioSequence == null) {
                     // the object doesn't have a sequence
-                    header.append("no sequence attached.");
+                    header.append(" no sequence attached.");
+                    LOG.debug(header);
                     continue;
                 }
 
-                Annotation annotation = bioSequence.getAnnotation();
+                SmallAnnotation annotation = bioSequence.getAnnotation();
                 String headerString = header.toString();
+                bioSequence.setAccession(new AccessionID(header.toString()));
 
                 if (headerString.length() > 0) {
-                    annotation.setProperty(FastaFormat.PROPERTY_DESCRIPTIONLINE, headerString);
+                    annotation.setProperty(PROPERTY_DESCRIPTIONLINE, headerString);
                 } else {
                     if (object instanceof BioEntity) {
-                        annotation.setProperty(FastaFormat.PROPERTY_DESCRIPTIONLINE,
-                                               ((BioEntity) object).getPrimaryIdentifier());
+                        annotation.setProperty(PROPERTY_DESCRIPTIONLINE,
+                                ((BioEntity) object).getPrimaryIdentifier());
                     } else {
                         // last resort
-                        annotation.setProperty(FastaFormat.PROPERTY_DESCRIPTIONLINE,
-                                               "sequence_" + exportedIDs.size());
+                        annotation.setProperty(PROPERTY_DESCRIPTIONLINE,
+                                "sequence_" + exportedIDs.size());
                     }
                 }
-                // write a BLAST submit form containing the sequence
-                out.write("<html>".getBytes(Charset.forName("UTF-8")));
-                SeqIOTools.writeFasta(out, bioSequence);
-                out.write("</html>".getBytes(Charset.forName("UTF-8")));
+
+                FastaWriterHelper.writeSequence(out, bioSequence);
                 writtenResultsCount++;
                 exportedIDs.add(objectId);
             }
@@ -206,9 +217,9 @@ public class SequenceBlaster implements Exporter {
     }
 
     private BioSequence createProtein(StringBuffer header, Object object,
-                                      List<ResultElement> row, Collection<Path> unionPathCollection,
-                                      Collection<Path> newPathCollection)
-        throws IllegalSymbolException {
+            List<ResultElement> row, Collection<Path> unionPathCollection,
+            Collection<Path> newPathCollection)
+        throws CompoundNotFoundException {
         BioSequence bioSequence;
         Protein protein = (Protein) object;
         bioSequence = BioSequenceFactory.make(protein);
@@ -218,11 +229,12 @@ public class SequenceBlaster implements Exporter {
         return bioSequence;
     }
 
-    private BioSequence createSequenceFeature(StringBuffer header,
-                                              Object object, List<ResultElement> row,
-                                              Collection<Path> unionPathCollection,
-                                              Collection<Path> newPathCollection)
-        throws IllegalSymbolException {
+    private BioSequence createSequenceFeature(
+            StringBuffer header,
+            Object object, List<ResultElement> row,
+            Collection<Path> unionPathCollection,
+            Collection<Path> newPathCollection)
+        throws CompoundNotFoundException {
         BioSequence bioSequence;
         SequenceFeature feature = (SequenceFeature) object;
         bioSequence = BioSequenceFactory.make(feature);
@@ -231,11 +243,13 @@ public class SequenceBlaster implements Exporter {
         return bioSequence;
     }
 
-    private Sequence createSequenceFeatureWithExtension(StringBuffer header,
-                                                        Object object, List<ResultElement> row,
-                                                        Collection<Path> unionPathCollection,
-                                                        Collection<Path> newPathCollection)
-        throws IllegalSymbolException {
+
+    private BioSequence createSequenceFeatureWithExtension(
+            StringBuffer header,
+            Object object, List<ResultElement> row,
+            Collection<Path> unionPathCollection,
+            Collection<Path> newPathCollection)
+        throws CompoundNotFoundException {
 
         SequenceFeature feature = (SequenceFeature) object;
 
@@ -250,9 +264,9 @@ public class SequenceBlaster implements Exporter {
         String chrResidueString;
         if (chromosomeSequenceMap.get(new MultiKey(chrName, org)) == null) {
             chrResidueString = chr.getSequence().getResidues()
-                .toString();
+                    .toString();
             chromosomeSequenceMap.put(
-                                      new MultiKey(chrName, strand, org), chr.getSequence().getResidues().toString());
+                    new MultiKey(chrName, strand, org), chr.getSequence().getResidues().toString());
         } else {
             chrResidueString = chromosomeSequenceMap.get(new MultiKey(chrName, strand, org));
         }
@@ -265,33 +279,34 @@ public class SequenceBlaster implements Exporter {
         end = Math.min(end, chrLength);
         start = Math.max(start, 1);
 
-        String seqName = "genomic_region_" + chrName + "_"
-            + start + "_" + end + "_"
-            + org.replace("\\. ", "_");
+//        String seqName = "genomic_region_" + chrName + "_"
+//                + start + "_" + end + "_"
+//                + org.replace("\\. ", "_");
+//        Sequence seq = DNATools.createDNASequence(chrResidueString.substring(start - 1, end),
+//                        seqName);
 
-        Sequence seq = DNATools.createDNASequence(chrResidueString.substring(start - 1, end),
-                                                  seqName);
+        AbstractSequence seq =
+                new DNASequence(chrResidueString.substring(start - 1, end).toLowerCase());
 
         if (NEGATIVE_STRAND.equals(strand)) {
-            try {
-                SymbolList flippedSeq = DNATools.reverseComplement(seq);
-                seq = DNATools.createDNASequence(flippedSeq.seqString(), seqName);
-            } catch (IllegalAlphabetException e) {
-                LOG.error("Export failed, Invalid sequence", e);
-                return null;
-            }
+            DNASequence ts = new DNASequence(chrResidueString.substring(start - 1, end));
+            seq = new DNASequence(ts.getReverseComplement().getSequenceAsString().toLowerCase());
         }
 
+        BioSequence bioSequence = new BioSequence(seq, (BioEntity) feature);
+        LOG.debug("SEQ: " + seq.getLength() + " - " + seq.getSequenceAsString());
+
         makeHeader(header, object, row, unionPathCollection, newPathCollection);
-        return seq;
+        return bioSequence;
     }
+
 
     /**
      * Set the header to be the contents of row, separated by spaces.
      */
     private void makeHeader(StringBuffer header, Object object,
-                            List<ResultElement> row, Collection<Path> unionPathCollection,
-                            Collection<Path> newPathCollection) {
+            List<ResultElement> row, Collection<Path> unionPathCollection,
+            Collection<Path> newPathCollection) {
 
         List<String> headerBits = new ArrayList<String>();
 
@@ -306,18 +321,18 @@ public class SequenceBlaster implements Exporter {
             headerBits.add("-");
         }
 
-        //        List<Object> keyFieldValues =
-        //                ClassKeyHelper.getKeyFieldValues((FastPathObject) object, this.classKeys);
-        //        for (Object key : keyFieldValues) {
-        //            if (key != null) {
-        //                headerBits.add(key.toString());
-        //            }
-        //        }
+//        List<Object> keyFieldValues =
+//                ClassKeyHelper.getKeyFieldValues((FastPathObject) object, this.classKeys);
+//        for (Object key : keyFieldValues) {
+//            if (key != null) {
+//                headerBits.add(key.toString());
+//            }
+//        }
 
         // here unionPathCollection is newPathCollection
         List<ResultElement> subRow = new ArrayList<ResultElement>();
         if (newPathCollection != null && unionPathCollection != null
-            && unionPathCollection.containsAll(newPathCollection)) {
+                && unionPathCollection.containsAll(newPathCollection)) {
             for (Path p : newPathCollection) {
                 if (!p.toString().endsWith(".id")) {
                     subRow.add(row.get(((List<Path>) unionPathCollection).indexOf(p)));
@@ -364,8 +379,8 @@ public class SequenceBlaster implements Exporter {
                 if (fieldValue == null) {
                     headerBits.add("-");
                 } else if (fieldValue.toString().equals(keyFieldValue)
-                           || (re.getObject() instanceof Location)
-                           || (re.getObject() instanceof Chromosome)) {
+                        || (re.getObject() instanceof Location)
+                        || (re.getObject() instanceof Chromosome)) {
                     // ignore the primaryIdentifier and Location in
                     // ResultElement
                     continue;
@@ -408,18 +423,21 @@ public class SequenceBlaster implements Exporter {
         return canExportStatic(clazzes);
     }
 
-    /**
+    /*
      * Method must have different name than canExport because canExport() method
      * is inherited from Exporter interface
-     *
-     * @param clazzes classes of result
-     * @return true if this exporter can export result composed of specified classes
+     */
+    /**
+     * @param clazzes
+     *            classes of result
+     * @return true if this exporter can export result composed of specified
+     *         classes
      */
     public static boolean canExportStatic(List<Class<?>> clazzes) {
         return (ExportHelper.getClassIndex(clazzes,
-                                           SequenceFeature.class) >= 0
+                SequenceFeature.class) >= 0
                 || ExportHelper.getClassIndex(clazzes, Protein.class) >= 0
-                //                || ExportHelper.getClassIndex(clazzes, Sequence.class) >= 0
+//                || ExportHelper.getClassIndex(clazzes, Sequence.class) >= 0
                 );
     }
 }
