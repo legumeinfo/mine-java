@@ -1,4 +1,4 @@
-package org.intermine.bio.web.export;
+package org.ncgr.intermine.bio.web.export;
 
 /*
  * Copyright (C) 2002-2017 FlyMine

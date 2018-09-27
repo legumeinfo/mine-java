@@ -1,4 +1,4 @@
-package org.intermine.bio.web.struts;
+package org.ncgr.intermine.bio.web.struts;
 
 /*
  * Copyright (C) 2002-2017 FlyMine
