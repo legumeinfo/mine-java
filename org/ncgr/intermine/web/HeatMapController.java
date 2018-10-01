@@ -101,7 +101,12 @@ public class HeatMapController extends TilesAction {
         try {
             sourcesResult = executor.execute(sourcesQuery);
         } catch (ObjectStoreException e) {
-            throw new RuntimeException("Error retrieving sources.", e);
+            setErrorMessage(request, "Error retrieving sources:"+e.toString());
+            return null;
+        }
+        if (!sourcesResult.hasNext()) {
+            setErrorMessage(request, sourcesQuery.toString());
+            return null;
         }
         while (sourcesResult.hasNext()) {
             // grab the fields
@@ -122,7 +127,8 @@ public class HeatMapController extends TilesAction {
             try {
                 samplesResult = executor.execute(samplesQuery);
             } catch (ObjectStoreException e) {
-                throw new RuntimeException("Error retrieving samples.", e);
+                setErrorMessage(request, "Error retrieving samples"+e.toString());
+                return null;
             }
             while (samplesResult.hasNext()) {
                 List<ResultElement> sampleRow = samplesResult.next();
@@ -137,8 +143,7 @@ public class HeatMapController extends TilesAction {
             
             // if no samples return an empty JSON string and bail - that's a bug!
             if (samples.size()==0) {
-                LOG.error("No samples returned for source:"+source);
-                setEmptyRequestAttributes(request);
+                setErrorMessage(request, "No samples returned for source:"+source);
                 return null;
             }
             
@@ -171,8 +176,7 @@ public class HeatMapController extends TilesAction {
             
             // if no expression values return an empty JSON string
             if (expressionValueMap.size()==0) {
-                request.setAttribute("expressionValueJSON", "{}");
-                LOG.error("No expression values retrieved.");
+                setErrorMessage(request, "No expression values retrieved.");
                 return null;
             }
             
@@ -265,6 +269,7 @@ public class HeatMapController extends TilesAction {
         }
         
         // set the return attributes
+        request.setAttribute("errorMessage", "");
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("geneCounts", geneCounts);
@@ -303,6 +308,8 @@ public class HeatMapController extends TilesAction {
         query.addView("Gene.expressionValues.sample.source.unit");               // 3
         query.addConstraint(Constraints.in("Gene", bag.getName()));
         query.addOrderBy("Gene.expressionValues.sample.source.primaryIdentifier", OrderDirection.ASC);
+        List<String> verifyList = query.verifyQuery();
+        if (!verifyList.isEmpty()) throw new RuntimeException("Sources query invalid: "+verifyList);
         return query;
     }
 
@@ -319,6 +326,8 @@ public class HeatMapController extends TilesAction {
         query.addView("ExpressionSample.description");
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
+        List<String> verifyList = query.verifyQuery();
+        if (!verifyList.isEmpty()) throw new RuntimeException("Samples query invalid: "+verifyList);
         return query;
     }
 
@@ -346,6 +355,8 @@ public class HeatMapController extends TilesAction {
         query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.in("Gene", bag.getName()));
         query.addConstraint(Constraints.isNotNull("Gene.expressionValues.value"));
+        List<String> verifyList = query.verifyQuery();
+        if (!verifyList.isEmpty()) throw new RuntimeException("Expression query invalid: "+verifyList);
         return query;
     }
 
@@ -361,6 +372,17 @@ public class HeatMapController extends TilesAction {
         request.setAttribute("sampleCounts", null);
         request.setAttribute("expressionJSON", "{}");
         request.setAttribute("descriptionsJSON", "{}");
+    }
+
+    /**
+     * Set an error message in the request.
+     *
+     * @param request the supplied HttpServletRequest object
+     * @param errorMessage the error message
+     */
+    void setErrorMessage(HttpServletRequest request, String errorMessage) {
+        setEmptyRequestAttributes(request);
+        request.setAttribute("errorMessage", errorMessage);
     }
 
 }
