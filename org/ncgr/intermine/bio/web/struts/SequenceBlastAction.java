@@ -140,7 +140,21 @@ public class SequenceBlastAction extends InterMineAction {
                 out.flush();
             }
 
-	}
+	} else {
+            
+            response.setContentType("text/html");
+            PrintWriter out = response.getWriter();
+            out.write("<html>");
+            out.write("<head>");
+            out.write("<title>Cannot send sequence to LIS BLAST service</title>");
+            out.write("</head>");
+            out.write("<body>");
+            out.write("<h1>SequenceBlastAction called for object which is neither SequenceFeature nor Protein.</h1>");
+            out.write("</body>");
+            out.write("</html>");
+            out.flush();
+            
+        }
 
 	return null;
 
