@@ -29,7 +29,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 /**
- * Generate the genotyping lines and values for each mappingPopulation containing the given marker.
+ * Generate the genotyping lines and values for each genotyping study containing the given marker.
  *
  * @author Sam Hokin
  */
@@ -48,7 +48,7 @@ public class MarkerDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Query the mappingPopulations, lines and genotypes associated with this marker and return them in lists.
+     * Query the genotypingStudies, lines and genotypes associated with this marker and return them in lists.
      */
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
@@ -56,44 +56,55 @@ public class MarkerDisplayer extends ReportDisplayer {
         PathQueryExecutor executor = im.getPathQueryExecutor();
         int markerID = reportObject.getId();
         
-        // query the mappingPopulations that contain this marker
-        PathQuery mpQuery = new PathQuery(im.getModel());
-        mpQuery.addViews("GeneticMarker.mappingPopulations.primaryIdentifier");
-        mpQuery.addConstraint(Constraints.eq("GeneticMarker.id", String.valueOf(markerID)));
-        mpQuery.addOrderBy("GeneticMarker.mappingPopulations.primaryIdentifier", OrderDirection.ASC);
-        ExportResultsIterator mpResult = getResults(executor, mpQuery);
-        List<String> mappingPopulations = new ArrayList<String>();
-        while (mpResult.hasNext()) {
-            List<ResultElement> row = mpResult.next();
+        // query the genotypingStudies that contain this marker
+        PathQuery gsQuery = new PathQuery(im.getModel());
+        gsQuery.addViews("GeneticMarker.genotypingStudies.primaryIdentifier");
+        gsQuery.addViews("GeneticMarker.genotypingStudies.description");
+        gsQuery.addViews("GeneticMarker.genotypingStudies.matrixNotes");
+        gsQuery.addConstraint(Constraints.eq("GeneticMarker.id", String.valueOf(markerID)));
+        gsQuery.addOrderBy("GeneticMarker.genotypingStudies.primaryIdentifier", OrderDirection.ASC);
+        ExportResultsIterator gsResult = getResults(executor, gsQuery);
+        List<String> genotypingStudies = new ArrayList<String>();
+        Map<String,String> genotypingStudyDescriptions = new LinkedHashMap<String,String>();
+        Map<String,String> genotypingStudyMatrixNotes = new LinkedHashMap<String,String>();
+        while (gsResult.hasNext()) {
+            List<ResultElement> row = gsResult.next();
             String primaryIdentifier = (String) row.get(0).getField();
-            mappingPopulations.add(primaryIdentifier);
+            String description = (String) row.get(1).getField();
+            String matrixNotes = (String) row.get(2).getField();
+            genotypingStudies.add(primaryIdentifier);
+            genotypingStudyDescriptions.put(primaryIdentifier, description);
+            genotypingStudyMatrixNotes.put(primaryIdentifier, matrixNotes);
         }
+
         
-        // query lines and values for each mappingPopulation, load results in a big map of maps
-        Map<String,Map<String,String>> mappingPopulationMap = new LinkedHashMap<String,Map<String,String>>();
-        for (String mappingPopulation : mappingPopulations) {
-            PathQuery gtQuery = new PathQuery(im.getModel());
-            gtQuery.addViews(
+        // query lines and values for each genotypingStudy, load results in a big map of maps
+        Map<String,Map<String,String>> genotypingStudyMap = new LinkedHashMap<String,Map<String,String>>();
+        for (String genotypingStudy : genotypingStudies) {
+            PathQuery gvQuery = new PathQuery(im.getModel());
+            gvQuery.addViews(
                              "GenotypeValue.line.primaryIdentifier",
                              "GenotypeValue.value"
                              );
-            gtQuery.addConstraint(Constraints.eq("GenotypeValue.line.mappingPopulation.primaryIdentifier", mappingPopulation));
-            gtQuery.addConstraint(Constraints.eq("GenotypeValue.marker.id", String.valueOf(markerID)));
-            gtQuery.addOrderBy("GenotypeValue.line.primaryIdentifier", OrderDirection.ASC);
-            ExportResultsIterator gtResult = getResults(executor, gtQuery);
+            gvQuery.addConstraint(Constraints.eq("GenotypeValue.line.genotypingStudy.primaryIdentifier", genotypingStudy));
+            gvQuery.addConstraint(Constraints.eq("GenotypeValue.marker.id", String.valueOf(markerID)));
+            gvQuery.addOrderBy("GenotypeValue.line.primaryIdentifier", OrderDirection.ASC);
+            ExportResultsIterator gvResult = getResults(executor, gvQuery);
             Map<String,String> valuesMap = new LinkedHashMap<String,String>();
-            while (gtResult.hasNext()) {
-                List<ResultElement> row = gtResult.next();
+            while (gvResult.hasNext()) {
+                List<ResultElement> row = gvResult.next();
                 String line = (String) row.get(0).getField();
                 String value = (String) row.get(1).getField();
                 valuesMap.put(line, value);
             }
-            mappingPopulationMap.put(mappingPopulation, valuesMap);
+            genotypingStudyMap.put(genotypingStudy, valuesMap);
         }
         
         // output results to HTTP request
-        request.setAttribute("mappingPopulationMap", mappingPopulationMap);
-
+        request.setAttribute("marker", reportObject.getObject());
+        request.setAttribute("genotypingStudyMap", genotypingStudyMap);
+        request.setAttribute("genotypingStudyDescriptions", genotypingStudyDescriptions);
+        request.setAttribute("genotypingStudyMatrixNotes", genotypingStudyMatrixNotes);
     }
 
     /**
