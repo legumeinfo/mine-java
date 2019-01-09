@@ -54,19 +54,23 @@ public class MarkerDisplayer extends ReportDisplayer {
     public void display(HttpServletRequest request, ReportObject reportObject) {
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
-        int markerID = reportObject.getId();
+        int markerId = reportObject.getId();
+        
+        // objects put into response
+        InterMineObject marker = reportObject.getObject();
+        Map<String,Map<String,String>> genotypingStudyMap = new LinkedHashMap<String,Map<String,String>>();
+        Map<String,String> genotypingStudyDescriptions = new LinkedHashMap<String,String>();
+        Map<String,String> genotypingStudyMatrixNotes = new LinkedHashMap<String,String>();
         
         // query the genotypingStudies that contain this marker
         PathQuery gsQuery = new PathQuery(im.getModel());
         gsQuery.addViews("GeneticMarker.genotypingStudies.primaryIdentifier");
         gsQuery.addViews("GeneticMarker.genotypingStudies.description");
         gsQuery.addViews("GeneticMarker.genotypingStudies.matrixNotes");
-        gsQuery.addConstraint(Constraints.eq("GeneticMarker.id", String.valueOf(markerID)));
+        gsQuery.addConstraint(Constraints.eq("GeneticMarker.id", String.valueOf(markerId)));
         gsQuery.addOrderBy("GeneticMarker.genotypingStudies.primaryIdentifier", OrderDirection.ASC);
         ExportResultsIterator gsResult = getResults(executor, gsQuery);
         List<String> genotypingStudies = new ArrayList<String>();
-        Map<String,String> genotypingStudyDescriptions = new LinkedHashMap<String,String>();
-        Map<String,String> genotypingStudyMatrixNotes = new LinkedHashMap<String,String>();
         while (gsResult.hasNext()) {
             List<ResultElement> row = gsResult.next();
             String primaryIdentifier = (String) row.get(0).getField();
@@ -76,32 +80,30 @@ public class MarkerDisplayer extends ReportDisplayer {
             genotypingStudyDescriptions.put(primaryIdentifier, description);
             genotypingStudyMatrixNotes.put(primaryIdentifier, matrixNotes);
         }
-
         
         // query lines and values for each genotypingStudy, load results in a big map of maps
-        Map<String,Map<String,String>> genotypingStudyMap = new LinkedHashMap<String,Map<String,String>>();
         for (String genotypingStudy : genotypingStudies) {
             PathQuery gvQuery = new PathQuery(im.getModel());
             gvQuery.addViews(
-                             "GenotypeValue.line.primaryIdentifier",
-                             "GenotypeValue.value"
+                             "GenotypeValue.value",
+                             "GenotypeValue.line.primaryIdentifier"
                              );
-            gvQuery.addConstraint(Constraints.eq("GenotypeValue.line.genotypingStudy.primaryIdentifier", genotypingStudy));
-            gvQuery.addConstraint(Constraints.eq("GenotypeValue.marker.id", String.valueOf(markerID)));
+            gvQuery.addConstraint(Constraints.eq("GenotypeValue.marker.id", String.valueOf(markerId)));
+            gvQuery.addConstraint(Constraints.eq("GenotypeValue.marker.genotypingStudies.primaryIdentifier", genotypingStudy));
             gvQuery.addOrderBy("GenotypeValue.line.primaryIdentifier", OrderDirection.ASC);
             ExportResultsIterator gvResult = getResults(executor, gvQuery);
             Map<String,String> valuesMap = new LinkedHashMap<String,String>();
             while (gvResult.hasNext()) {
                 List<ResultElement> row = gvResult.next();
-                String line = (String) row.get(0).getField();
-                String value = (String) row.get(1).getField();
+                String value = (String) row.get(0).getField();
+                String line = (String) row.get(1).getField();
                 valuesMap.put(line, value);
             }
             genotypingStudyMap.put(genotypingStudy, valuesMap);
         }
         
         // output results to HTTP request
-        request.setAttribute("marker", reportObject.getObject());
+        request.setAttribute("marker", marker);
         request.setAttribute("genotypingStudyMap", genotypingStudyMap);
         request.setAttribute("genotypingStudyDescriptions", genotypingStudyDescriptions);
         request.setAttribute("genotypingStudyMatrixNotes", genotypingStudyMatrixNotes);
