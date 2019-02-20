@@ -14,6 +14,7 @@ import org.intermine.api.results.ExportResultsIterator;
 import org.intermine.api.results.ResultElement;
 import org.intermine.metadata.Model;
 import org.intermine.objectstore.ObjectStoreException;
+import org.intermine.pathquery.Constraints;
 import org.intermine.pathquery.OrderDirection;
 import org.intermine.pathquery.PathQuery;
 import org.intermine.web.displayer.ReportDisplayer;
@@ -60,11 +61,12 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
         PathQueryExecutor executor = im.getPathQueryExecutor(user);
         Model model = im.getModel();
 
-        // query phenotype names
-        List<String> phenotypes = new LinkedList<>();
+        // query phenotype names for genotypingStudy
         PathQuery phenotypeQuery = new PathQuery(model);
-        phenotypeQuery.addView("Phenotype.primaryIdentifier");
-        phenotypeQuery.addOrderBy("Phenotype.primaryIdentifier", OrderDirection.ASC);
+        phenotypeQuery.addView("GenotypingStudy.lines.phenotypeValues.phenotype.primaryIdentifier");
+        phenotypeQuery.addOrderBy("GenotypingStudy.lines.phenotypeValues.phenotype.primaryIdentifier", OrderDirection.ASC);
+        phenotypeQuery.addConstraint(Constraints.eq("GenotypingStudy.primaryIdentifier", genotypingStudy));
+        List<String> phenotypes = new LinkedList<>();
         try {
             ExportResultsIterator iterator = executor.execute(phenotypeQuery);
             while (iterator.hasNext()) {
@@ -81,5 +83,4 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
         request.setAttribute("matrixNotes", matrixNotes);
         request.setAttribute("phenotypes", phenotypes);
     }
-
 }
