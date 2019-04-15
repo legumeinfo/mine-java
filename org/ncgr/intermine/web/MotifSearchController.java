@@ -11,8 +11,13 @@ package org.ncgr.intermine.web;
  */
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.rmi.RemoteException;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -20,12 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-import java.text.DecimalFormat;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.xml.bind.JAXBException;
+import javax.xml.rpc.ServiceException;
 
+import org.apache.http.client.ClientProtocolException;
 import org.apache.log4j.Logger;
 import org.apache.struts.action.ActionForm;
 import org.apache.struts.action.ActionForward;
@@ -47,6 +54,8 @@ import org.intermine.pathquery.OrderDirection;
 import org.intermine.pathquery.PathQuery;
 import org.intermine.web.logic.session.SessionMethods;
 
+import org.ietf.jgss.GSSException;
+
 import org.json.JSONObject;
 
 import org.globus.gram.GramJob;
@@ -65,6 +74,7 @@ import org.biojava.nbio.core.alignment.matrices.SubstitutionMatrixHelper;
 import org.biojava.nbio.core.alignment.template.AlignedSequence;
 import org.biojava.nbio.core.alignment.template.SequencePair;
 import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
+import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
 import org.biojava.nbio.core.sequence.DNASequence;
 import org.biojava.nbio.core.sequence.compound.NucleotideCompound;
 import org.biojava.nbio.core.sequence.io.FastaWriterHelper;
@@ -129,12 +139,12 @@ public class MotifSearchController extends TilesAction {
     static String ALIGNER = "SmithWaterman"; // AnchoredPairwiseSequenceAligner, GuanUberbacher, NeedlemanWunsch, SmithWaterman
 
     // Opal2 stuff
-    static final String BLAST_SERVICE_URL = "http://intermine.ncgr.org/opal2/services/blast";
-    static final String SEQLOGO_SERVICE_URL = "http://intermine.ncgr.org/opal2/services/seqlogo";
+    static final String BLAST_SERVICE_URL = "http://localhost:8080/opal2/services/blast";
+    static final String SEQLOGO_SERVICE_URL = "http://localhost:8080/opal2/services/seqlogo";
     static final String LOGO_FILE = "alignment.png";
 
     // MotifSearch servlet (for established motifs)
-    static final String MOTIF_SEARCH_URL = "http://intermine.ncgr.org/motifs/motifSearch"; // ?query=TATATA
+    static final String MOTIF_SEARCH_URL = "http://localhost:8080/motifs/motifSearch"; // ?query=TATATA
 
     static DecimalFormat dec = new DecimalFormat("0.0000");
     static DecimalFormat rnd = new DecimalFormat("+00;-00");
@@ -148,7 +158,9 @@ public class MotifSearchController extends TilesAction {
      * {@inheritDoc}
      */
     @Override
-    public ActionForward execute(ComponentContext context, ActionMapping mapping, ActionForm form, HttpServletRequest request, HttpServletResponse response) {
+    public ActionForward execute(ComponentContext context, ActionMapping mapping, ActionForm form, HttpServletRequest request, HttpServletResponse response)
+        throws MalformedURLException, InterruptedException, RemoteException, JAXBException, CompoundNotFoundException, ClientProtocolException, ServiceException,
+               FileNotFoundException, IOException, GSSException {
         
         // standard stuff that's in any controller
         HttpSession session = request.getSession();
@@ -179,7 +191,7 @@ public class MotifSearchController extends TilesAction {
             request.setAttribute("errorMessage", "---"); // flag to not show motif search results at all
             return null;
         }
-        
+
         // build the map of FASTA sequences
         PathQuery bagQuery = queryBag(model, bag);
         ExportResultsIterator bagResult;
@@ -214,18 +226,15 @@ public class MotifSearchController extends TilesAction {
         // we'll add the found hits to this map of SequenceHits
         TreeMap<String,SequenceHits> seqHitsMap = new TreeMap<String,SequenceHits>();
         
-        try {
+        // the BlastClient submits the BLAST jobs to the Opal2 server
+        BlastClient bc = new BlastClient(BLAST_SERVICE_URL);
             
-            // the BlastClient submits the BLAST jobs to the Opal2 server
-            BlastClient bc = new BlastClient(BLAST_SERVICE_URL);
-            
-            // loop through each sequence as query against the remaining as subject and submit blast job
-            for (String queryID: sequenceMap.keySet()) {
-                
+        // loop through each sequence as query against the remaining as subject and submit blast job
+        for (String queryID: sequenceMap.keySet()) {
+            try {
                 // create the query data
                 String queryFasta = ">"+queryID+"\n"+sequenceMap.get(queryID)+"\n";
                 byte[] queryData = queryFasta.getBytes();
-            
                 // create the subject data = all sequences but the query sequence
                 LinkedHashMap<String,String> subjectMap = new LinkedHashMap<String,String>(sequenceMap);
                 subjectMap.remove(queryID);
@@ -234,72 +243,76 @@ public class MotifSearchController extends TilesAction {
                     subjectFasta +=  ">"+subjectId+"\n"+subjectMap.get(subjectId)+"\n";
                 }
                 byte[] subjectData = subjectFasta.getBytes();
-            
                 // now run blastn on the query and subject with parameters set in Opal2 caller
                 JobSubOutputType jobOutput = bc.launchJob(subjectData, queryData);
                 StatusOutputType status = jobOutput.getStatus();
                 String jobID = jobOutput.getJobID();
                 jobMap.put(jobID,queryID);
                 LOG.info("Submitted BlastClient job for query sequence:"+queryID+"; jobID="+jobID);
-            }
-        
-            // poll all the jobs until they're all finished
-            int maxWaits = MAX_WAIT_SECONDS/WAIT_SECONDS;
-            boolean finished = false;
-            int waits = 0;
-            while (!finished && waits<maxWaits) {
-                TimeUnit.SECONDS.sleep(WAIT_SECONDS);
-                waits++;
-                finished = true; // initialize, will be false if a job not finished
-                for (String jobID : jobMap.keySet()) {
-                    StatusOutputType status = bc.queryStatus(jobID);
-                    int code = status.getCode();
-                    finished = finished && (code==GramJob.STATUS_DONE || code==GramJob.STATUS_FAILED || code==GramJob.STATUS_SUSPENDED || code==GramJob.STATUS_UNSUBMITTED);
-                    if (!finished) break;
-                }
-            }
-        
-            // bail if took too long
-            if (!finished) {
-                request.setAttribute("errorMessage", "Submitted BLAST jobs took too long. Submit fewer sequences or increase MAX_WAIT_SECONDS in MotifSearchController.java.");
+            } catch (Exception ex) {
+                request.setAttribute("errorMessage", "Error submitting BlastClient job for query sequence "+queryID+": "+ex.toString());
                 return null;
             }
+        }
         
-            // now plow through the jobs and build the SequenceHits set
+        // poll all the jobs until they're all finished
+        int maxWaits = MAX_WAIT_SECONDS/WAIT_SECONDS;
+        boolean finished = false;
+        int waits = 0;
+        while (!finished && waits<maxWaits) {
+            TimeUnit.SECONDS.sleep(WAIT_SECONDS);
+            waits++;
+            finished = true; // initialize, will be false if a job not finished
             for (String jobID : jobMap.keySet()) {
-                String queryID = jobMap.get(jobID);
                 StatusOutputType status = bc.queryStatus(jobID);
-                // get the BlastObject from the resulting XML file and add the results to the SequenceHits map
-                if (status.getCode()==GramJob.STATUS_DONE) {
-                    URL url = new URL(status.getBaseURL()+"/"+BlastClient.OUTPUT_FILENAME);
-                    BlastOutput blastOutput = BlastUtils.getBlastOutput(url);
-                    BlastOutputIterations iterations = blastOutput.getBlastOutputIterations();
-                    if (iterations!=null) {
-                        List<Iteration> iterationList = iterations.getIteration();
-                        if (iterationList!=null) {
-                            for (Iteration iteration : iterationList) {
-                                if (iteration.getIterationMessage()==null) {
-                                    List<Hit> hitList = iteration.getIterationHits().getHit();
-                                    for (Hit hit : hitList) {
-                                        String hitID = hit.getHitDef();
-                                        HitHsps hsps = hit.getHitHsps();
-                                        if (hsps!=null) {
-                                            List<Hsp> hspList = hsps.getHsp();
-                                            if (hspList!=null) {
-                                                for (Hsp hsp : hspList) {
-                                                    SequenceHit seqHit = new SequenceHit(queryID, hitID, hsp);
-                                                    // cull motifs based on their size and content
-                                                    boolean keep = true;
-                                                    keep = keep && (seqHit.sequence.contains("C") || seqHit.sequence.contains("G")); // too many ATATAT common strings
-                                                    keep = keep && seqHit.sequence.length()<=MAX_MOTIF_LENGTH; // long motifs aren't biologically interesting
-                                                    if (keep) {
-                                                        if (seqHitsMap.containsKey(seqHit.sequence)) {
-                                                            SequenceHits seqHits = seqHitsMap.get(seqHit.sequence);
-                                                            seqHits.addSequenceHit(seqHit);
-                                                        } else {
-                                                            SequenceHits seqHits = new SequenceHits(seqHit);
-                                                            seqHitsMap.put(seqHit.sequence, seqHits);
-                                                        }
+                int code = status.getCode();
+                finished = finished && (code==GramJob.STATUS_DONE || code==GramJob.STATUS_FAILED || code==GramJob.STATUS_SUSPENDED || code==GramJob.STATUS_UNSUBMITTED);
+                if (!finished) break;
+            }
+        }
+        
+        // bail if took too long
+        if (!finished) {
+            request.setAttribute("errorMessage", "Submitted BLAST jobs took too long. Submit fewer sequences or increase MAX_WAIT_SECONDS in MotifSearchController.java.");
+            return null;
+        }
+        
+        // now plow through the jobs and build the SequenceHits set
+        for (String jobID : jobMap.keySet()) {
+            String queryID = jobMap.get(jobID);
+            StatusOutputType status = bc.queryStatus(jobID);
+            // get the BlastObject from the resulting XML file and add the results to the SequenceHits map
+            if (status.getCode()==GramJob.STATUS_DONE) {
+                URL url = new URL(status.getBaseURL()+"/"+BlastClient.OUTPUT_FILENAME);
+                // DEBUG
+                System.out.println("BLAST url="+url.toString());
+                BlastOutput blastOutput = BlastUtils.getBlastOutput(url);
+                BlastOutputIterations iterations = blastOutput.getBlastOutputIterations();
+                if (iterations!=null) {
+                    List<Iteration> iterationList = iterations.getIteration();
+                    if (iterationList!=null) {
+                        for (Iteration iteration : iterationList) {
+                            if (iteration.getIterationMessage()==null) {
+                                List<Hit> hitList = iteration.getIterationHits().getHit();
+                                for (Hit hit : hitList) {
+                                    String hitID = hit.getHitDef();
+                                    HitHsps hsps = hit.getHitHsps();
+                                    if (hsps!=null) {
+                                        List<Hsp> hspList = hsps.getHsp();
+                                        if (hspList!=null) {
+                                            for (Hsp hsp : hspList) {
+                                                SequenceHit seqHit = new SequenceHit(queryID, hitID, hsp);
+                                                // cull motifs based on their size and content
+                                                boolean keep = true;
+                                                keep = keep && (seqHit.sequence.contains("C") || seqHit.sequence.contains("G")); // too many ATATAT common strings
+                                                keep = keep && seqHit.sequence.length()<=MAX_MOTIF_LENGTH; // long motifs aren't biologically interesting
+                                                if (keep) {
+                                                    if (seqHitsMap.containsKey(seqHit.sequence)) {
+                                                        SequenceHits seqHits = seqHitsMap.get(seqHit.sequence);
+                                                        seqHits.addSequenceHit(seqHit);
+                                                    } else {
+                                                        SequenceHits seqHits = new SequenceHits(seqHit);
+                                                        seqHitsMap.put(seqHit.sequence, seqHits);
                                                     }
                                                 }
                                             }
@@ -309,107 +322,113 @@ public class MotifSearchController extends TilesAction {
                             }
                         }
                     }
-                } else {
-                    // bail; something went wrong on this blast run
-                    request.setAttribute("errorMessage", status.getMessage());
-                    return null;
                 }
+            } else {
+                // bail; something went wrong on this blast run
+                request.setAttribute("errorMessage", "Error on blast run jobID="+jobID+":"+status.getMessage());
+                return null;
+            }
 
-            } // each query/job
+        } // each query/job
+        
+        // finish timing
+        long blastEnd = System.currentTimeMillis();
 
-            // finish timing
-            long blastEnd = System.currentTimeMillis();
-
-            // collect the SequenceHits in a set sorted by score
-            TreeSet<SequenceHits> seqHitsSet = new TreeSet<SequenceHits>(seqHitsMap.values());
+        // collect the SequenceHits in a set sorted by score
+        TreeSet<SequenceHits> seqHitsSet = new TreeSet<SequenceHits>(seqHitsMap.values());
             
-            // now process the hits
-            int count = 0;
-            boolean first = true;
-            DNASequence topMotif = null;
-            List<DNASequence> logoMotifs = new ArrayList<DNASequence>();
-            List<Object> jsonList = new ArrayList<Object>();
-            for (SequenceHits seqHits : seqHitsSet.descendingSet()) {
-
-                // do analysis for sequence logo
-                boolean addedToLogo = false;
-                if (first) {
-                    first = false;
-                    // save the top motif for pairwise alignments
-                    topMotif = new DNASequence(seqHits.sequence);
-                    logoMotifs.add(topMotif);
-                    addedToLogo = true;
+        // now process the hits
+        int count = 0;
+        boolean first = true;
+        DNASequence topMotif = null;
+        List<DNASequence> logoMotifs = new ArrayList<DNASequence>();
+        List<Object> jsonList = new ArrayList<Object>();
+        for (SequenceHits seqHits : seqHitsSet.descendingSet()) {
+            // do analysis for sequence logo
+            boolean addedToLogo = false;
+            if (first) {
+                first = false;
+                // save the top motif for pairwise alignments
+                topMotif = new DNASequence(seqHits.sequence);
+                logoMotifs.add(topMotif);
+                addedToLogo = true;
+            } else {
+                // do a pairwise alignment with topMotif
+                DNASequence thisMotif = new DNASequence(seqHits.sequence);
+                AbstractMatrixAligner<DNASequence,NucleotideCompound> aligner = null;
+                if (ALIGNER.equals("AnchoredPairwiseSequenceAligner")) {
+                    aligner = new AnchoredPairwiseSequenceAligner<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
+                } else if (ALIGNER.equals("GuanUberbacher")) {
+                    aligner = new GuanUberbacher<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
+                } else if (ALIGNER.equals("NeedlemanWunsch")) {
+                    aligner = new NeedlemanWunsch<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
+                } else if (ALIGNER.equals("SmithWaterman")) {
+                    aligner = new SmithWaterman<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
                 } else {
-                    // do a pairwise alignment with topMotif
-                    DNASequence thisMotif = new DNASequence(seqHits.sequence);
-                    AbstractMatrixAligner<DNASequence,NucleotideCompound> aligner = null;
-                    if (ALIGNER.equals("AnchoredPairwiseSequenceAligner")) {
-                        aligner = new AnchoredPairwiseSequenceAligner<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
-                    } else if (ALIGNER.equals("GuanUberbacher")) {
-                        aligner = new GuanUberbacher<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
-                    } else if (ALIGNER.equals("NeedlemanWunsch")) {
-                        aligner = new NeedlemanWunsch<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
-                    } else if (ALIGNER.equals("SmithWaterman")) {
-                        aligner = new SmithWaterman<DNASequence,NucleotideCompound>(thisMotif, topMotif, gapPenalty, subMatrix);
-                    } else {
-                        System.err.println("ERROR: ALIGNER must be one of AnchoredPairwiseSequenceAligner, GuanUberbacher, NeedlemanWunsch, SmithWaterman");
-                        System.exit(1);
-                    }
-                    double score = aligner.getScore();
-                    double distance = aligner.getDistance();
-                    double similarity = aligner.getSimilarity();
-                    if (distance<MAX_DISTANCE) {
-                        logoMotifs.add(thisMotif);
-                        addedToLogo = true;
-                    }
+                    System.err.println("ERROR: ALIGNER must be one of AnchoredPairwiseSequenceAligner, GuanUberbacher, NeedlemanWunsch, SmithWaterman");
+                    System.exit(1);
                 }
+                double score = aligner.getScore();
+                double distance = aligner.getDistance();
+                double similarity = aligner.getSimilarity();
+                if (distance<MAX_DISTANCE) {
+                    logoMotifs.add(thisMotif);
+                    addedToLogo = true;
+                }
+            }
                 
-                // add this motif and its containing features to the JSON data list; logo motifs are always included regardless of position in list
-                if (count++<MAX_MOTIF_COUNT || addedToLogo) {
-                    Map<String,Object> seqHitsData = new LinkedHashMap<String,Object>();
-                    if (addedToLogo) {
-                        seqHitsData.put("sequence", seqHits.sequence+"*");
-                    } else {
-                        seqHitsData.put("sequence", seqHits.sequence);
-                    }
-                    seqHitsData.put("length", seqHits.sequence.length());
-                    seqHitsData.put("score", seqHits.score);
-                    seqHitsData.put("num", seqHits.uniqueIDs.size());
-                    seqHitsData.put("regions", new ArrayList(seqHits.uniqueHits));
-                    seqHitsData.put("ids", new ArrayList(seqHits.uniqueIDs));
-                    // add a best-hit protein for our motif if it's logo-worthy
-                    if (addedToLogo) {
+            // add this motif and its containing features to the JSON data list; logo motifs are always included regardless of position in list
+            if (count++<MAX_MOTIF_COUNT || addedToLogo) {
+                Map<String,Object> seqHitsData = new LinkedHashMap<String,Object>();
+                if (addedToLogo) {
+                    seqHitsData.put("sequence", seqHits.sequence+"*");
+                } else {
+                    seqHitsData.put("sequence", seqHits.sequence);
+                }
+                seqHitsData.put("length", seqHits.sequence.length());
+                seqHitsData.put("score", seqHits.score);
+                seqHitsData.put("num", seqHits.uniqueIDs.size());
+                seqHitsData.put("regions", new ArrayList(seqHits.uniqueHits));
+                seqHitsData.put("ids", new ArrayList(seqHits.uniqueIDs));
+                // add a best-hit protein for our motif if it's logo-worthy
+                if (addedToLogo) {
+                    try {
                         MotifSearchClient msc = new MotifSearchClient(MOTIF_SEARCH_URL, seqHits.sequence);
                         JSONObject bestHit = msc.getBestHitJSONObject();
                         seqHitsData.put("bestHitName", bestHit.getString("name"));
                         seqHitsData.put("bestHitScore", perc.format(bestHit.getDouble("score")/seqHits.sequence.length()));
                         seqHitsData.put("bestHitBaseId", bestHit.getString("baseId")+"."+bestHit.getInt("version"));
-                    } else {
-                        seqHitsData.put("bestHitName", "");
-                        seqHitsData.put("bestHitScore", "");
-                        seqHitsData.put("bestHitBaseId", "");
+                    } catch (Exception ex) {
+                        // bail; something went wrong on this MotifSearchClient run
+                        request.setAttribute("errorMessage", "Error running MotifSearchClient URL="+MOTIF_SEARCH_URL+"; sequence="+seqHits.sequence+":"+ex.toString());
+                        return null;
                     }
-                    jsonList.add(seqHitsData);
+                } else {
+                    seqHitsData.put("bestHitName", "");
+                    seqHitsData.put("bestHitScore", "");
+                    seqHitsData.put("bestHitBaseId", "");
                 }
-
+                jsonList.add(seqHitsData);
             }
-            LOG.info(logoMotifs.size()+" motifs collected for sequence logo.");
+        }
+        LOG.info(logoMotifs.size()+" motifs collected for sequence logo.");
             
-            // do multi-sequence alignment of the logo list and submit seqlogo job
-            String logoURL = null;
-            if (logoMotifs.size()>1) {
-                Object[] settings = new Object[3];
-                settings[0] = gapPenalty;
-                settings[1] = Alignments.PairwiseSequenceScorerType.GLOBAL_IDENTITIES;
-                settings[2] = Alignments.ProfileProfileAlignerType.GLOBAL;
-                org.biojava.nbio.core.alignment.template.Profile<DNASequence,NucleotideCompound> alignmentProfile = Alignments.getMultipleSequenceAlignment(logoMotifs, settings);
-                String logoFasta = "";
-                for (AlignedSequence aseq : alignmentProfile) {
-                    logoFasta += ">"+aseq.getOriginalSequence().getSequenceAsString()+"\n";
-                    logoFasta += aseq.getSequenceAsString()+"\n";
-                }
-                // submit seqlogo job and get image URL
-                byte[] fastaData = logoFasta.getBytes();
+        // do multi-sequence alignment of the logo list and submit seqlogo job
+        String logoURL = null;
+        if (logoMotifs.size()>1) {
+            Object[] settings = new Object[3];
+            settings[0] = gapPenalty;
+            settings[1] = Alignments.PairwiseSequenceScorerType.GLOBAL_IDENTITIES;
+            settings[2] = Alignments.ProfileProfileAlignerType.GLOBAL;
+            org.biojava.nbio.core.alignment.template.Profile<DNASequence,NucleotideCompound> alignmentProfile = Alignments.getMultipleSequenceAlignment(logoMotifs, settings);
+            String logoFasta = "";
+            for (AlignedSequence aseq : alignmentProfile) {
+                logoFasta += ">"+aseq.getOriginalSequence().getSequenceAsString()+"\n";
+                logoFasta += aseq.getSequenceAsString()+"\n";
+            }
+            // submit seqlogo job and get image URL
+            byte[] fastaData = logoFasta.getBytes();
+            try {
                 SeqlogoClient sc = new SeqlogoClient(SEQLOGO_SERVICE_URL);
                 JobSubOutputType subOut = sc.launchJob(fastaData, null);
                 String jobID = subOut.getJobID();
@@ -424,42 +443,48 @@ public class MotifSearchController extends TilesAction {
                     int code = status.getCode();
                     finished = code==GramJob.STATUS_DONE || code==GramJob.STATUS_FAILED || code==GramJob.STATUS_SUSPENDED || code==GramJob.STATUS_UNSUBMITTED;
                 }
-                if (finished) logoURL = sc.queryStatus(jobID).getBaseURL()+"/"+LOGO_FILE;
+                if (finished) {
+                    String baseUrl = sc.queryStatus(jobID).getBaseURL().toString(); // http://localhost:8080/appseqlogo1555358223103-2076483855
+                    int dirIndex = baseUrl.indexOf("appseqlogo");
+                    String dirPart = baseUrl.substring(dirIndex);
+                    String protocol = "https";
+                    if (request.getServerPort()!=443) protocol = "http";
+                    logoURL = protocol+"://"+request.getServerName()+"/"+dirPart+"/"+LOGO_FILE;
+                }
+            } catch (Exception ex) {
+                // bail; something went wrong with this Seqlogo run
+                request.setAttribute("errorMessage", "Error running SeqlogoClient URL="+SEQLOGO_SERVICE_URL+":"+ex.toString());
+                return null;
             }
+        }
             
-            // create the JSON
-            Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
-            jsonMap.put("data", jsonList);
-            JSONObject jo = new JSONObject(jsonMap);
+        // create the JSON
+        Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
+        jsonMap.put("data", jsonList);
+        JSONObject jo = new JSONObject(jsonMap);
             
-            // ---------------------------
-            // SET HTTP REQUEST ATTRIBUTES
-            // ---------------------------
-
-            request.setAttribute("MAX_MOTIF_LENGTH", MAX_MOTIF_LENGTH);
-            request.setAttribute("MAX_MOTIF_COUNT", MAX_MOTIF_COUNT);
-            request.setAttribute("MAX_DISTANCE", MAX_DISTANCE);
-            request.setAttribute("GOP", GOP);
-            request.setAttribute("GEP", GEP);
-            request.setAttribute("ALIGNER", ALIGNER);
-            request.setAttribute("featureType", featureType);
-            request.setAttribute("featureCount", featureCount);
-            request.setAttribute("blastTime", blastEnd-blastStart);
-            request.setAttribute("logoMotifsCount", logoMotifs.size());
-            if (logoURL!=null) request.setAttribute("logoURL", logoURL);
-
-            request.setAttribute("seqHitsJSON", jo.toString());
+        // ---------------------------
+        // SET HTTP REQUEST ATTRIBUTES
+        // ---------------------------
             
-            // DONE!
-            return null;
+        request.setAttribute("MAX_MOTIF_LENGTH", MAX_MOTIF_LENGTH);
+        request.setAttribute("MAX_MOTIF_COUNT", MAX_MOTIF_COUNT);
+        request.setAttribute("MAX_DISTANCE", MAX_DISTANCE);
+        request.setAttribute("GOP", GOP);
+        request.setAttribute("GEP", GEP);
+        request.setAttribute("ALIGNER", ALIGNER);
+        request.setAttribute("featureType", featureType);
+        request.setAttribute("featureCount", featureCount);
+        request.setAttribute("blastTime", blastEnd-blastStart);
+        request.setAttribute("logoMotifsCount", logoMotifs.size());
+        request.setAttribute("logoURL", logoURL);
+        request.setAttribute("seqHitsJSON", jo.toString());
+            
+        // not sure if we need this
+        ConcurrencyTools.shutdown();  
 
-        } catch (Exception ex) {
-            request.setAttribute("errorMessage", ex.toString());
-            return null;
-        } finally {
-            ConcurrencyTools.shutdown();  
-        }            
-
+        // DONE!
+        return null;
     }
 
     /**
