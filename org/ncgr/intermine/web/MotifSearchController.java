@@ -395,9 +395,16 @@ public class MotifSearchController extends TilesAction {
                     try {
                         MotifSearchClient msc = new MotifSearchClient(MOTIF_SEARCH_URL, seqHits.sequence);
                         JSONObject bestHit = msc.getBestHitJSONObject();
-                        seqHitsData.put("bestHitName", bestHit.getString("name"));
-                        seqHitsData.put("bestHitScore", perc.format(bestHit.getDouble("score")/seqHits.sequence.length()));
-                        seqHitsData.put("bestHitBaseId", bestHit.getString("baseId")+"."+bestHit.getInt("version"));
+                        // bestHit is null if none found
+                        if (bestHit!=null) {
+                            seqHitsData.put("bestHitName", bestHit.getString("name"));
+                            seqHitsData.put("bestHitScore", perc.format(bestHit.getDouble("score")/seqHits.sequence.length()));
+                            seqHitsData.put("bestHitBaseId", bestHit.getString("baseId")+"."+bestHit.getInt("version"));
+                        } else {
+                            seqHitsData.put("bestHitName", "");
+                            seqHitsData.put("bestHitScore", "");
+                            seqHitsData.put("bestHitBaseId", "");
+                        }
                     } catch (Exception ex) {
                         // bail; something went wrong on this MotifSearchClient run
                         request.setAttribute("errorMessage", "Error running MotifSearchClient URL="+MOTIF_SEARCH_URL+"; sequence="+seqHits.sequence+":"+ex.toString());
