@@ -203,7 +203,7 @@ public class SequenceBlastAction extends InterMineAction {
         if (classNames != null && classNames.length() != 0) {
             String [] classArray = classNames.split(",");
             for (int i = 0; i < classArray.length; i++) {
-                classList.add(TypeUtil.instantiate(os.getModel().getPackageName() + "."
+                classList.add(TypeUtil.getTypeByName(os.getModel().getPackageName() + "."
                                                    + classArray[i]));
             }
         } else {
