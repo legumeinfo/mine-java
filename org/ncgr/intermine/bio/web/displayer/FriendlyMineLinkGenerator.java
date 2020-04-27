@@ -35,7 +35,7 @@ import org.intermine.webservice.server.core.Predicate;
 /**
  * Helper class for intermine links generated on report and lists pages
  *
- * Modified by SH to glean similar genes from GeneFamily rather than Homologue.
+ * Modified by SH to glean similar genes from the same gene family rather than Homologues.
  *
  * @author Julie Sullivan, Sam Hokin
  */
@@ -88,22 +88,24 @@ public final class FriendlyMineLinkGenerator implements InterMineLinkGenerator {
 
         LinkFetcher(Mine thisMine, Mine mine) {
             this.thisMine = thisMine; // The local mine, where the idents come from
-            this.thatMine = mine; // The remote mine, where we want to find things.
+            this.thatMine = mine;     // The remote mine, where we want to find things.
             this.predicate = new MustBeIn(thatMine.getDefaultValues());
         }
 
         Collection<PartnerLink> fetch(ObjectRequest req) {
 
             // Phase one -- query the remote mine for genes in the same gene family.
-            Map<String, Set<ObjectDetails>> genes = remoteHomologueStrategy(req);
+            Map<String, Set<ObjectDetails>> genes = remoteGeneFamilyStrategy(req);
+	    
             // Phase two -- query this mine for genes in the same gene family.
             if (genes == null || genes.isEmpty()) {
-                genes = localHomologueStrategy(req);
+                genes = localGeneFamilyStrategy(req);
             }
 
             // Phase three - check if the remote mine contains this actual object.
             PathQuery q = getGeneQuery(thatMine, req);
             Map<String, Set<ObjectDetails>> matches = runQuery(thatMine, q);
+
             if (matches != null) {
                 genes.putAll(matches);
             }
@@ -111,54 +113,68 @@ public final class FriendlyMineLinkGenerator implements InterMineLinkGenerator {
             return toLinks(genes);
         }
 
-        /**
-         * Look for homologues to the requested objects in the remote mine, but only accept
-         * homologues for organisms that mine specialises in.
+	/**
+         * Look for orthologues to the requested objects in the remote mine, but only accept
+         * orthologues for organisms the remote mine specialises in.
          * @param req The definition of the thing we are looking for.
          * @return A mapping from organisms to groups of identifiers.
          */
-        private Map<String, Set<ObjectDetails>> remoteHomologueStrategy(ObjectRequest req) {
-            PathQuery q = getHomologueQuery(thatMine, req);
+        private Map<String, Set<ObjectDetails>> remoteGeneFamilyStrategy(ObjectRequest req) {
+            PathQuery q = getGeneFamilyQuery(thatMine, req);
             return runQuery(thatMine, q);
         }
 
         /**
-         * Look for homologues to the requested objects in the local mine, and accept
-         * all answers.
+         * Look for orthologues to the requested objects in the local mine, but only accept
+	 * orthologues for organisms for which the local mine specializes in.
          * @param req The definition of the thing we are looking for.
          * @return A mapping from organisms to groups of identifiers.
          */
-        private Map<String, Set<ObjectDetails>> localHomologueStrategy(ObjectRequest req) {
-            PathQuery q = getHomologueQuery(thisMine, req);
+        private Map<String, Set<ObjectDetails>> localGeneFamilyStrategy(ObjectRequest req) {
+            PathQuery q = getGeneFamilyQuery(thisMine, req);
             return runQuery(thisMine, q);
         }
 
-        /**
-         * The PathQuery that returns "homologues", defined in this case as genes in the same gene family.
+        // // Select the output columns:
+        // query.addViews("Gene.primaryIdentifier",
+        //         "Gene.secondaryIdentifier",
+        //         "Gene.organism.shortName");
+
+        // // Add orderby
+        // query.addOrderBy("Gene.primaryIdentifier", OrderDirection.ASC);
+
+        // // Filter the results with the following constraints:
+        // query.addConstraint(Constraints.eq("Gene.geneFamily.genes.primaryIdentifier", "glyma.Wm82.gnm2.ann1.Glyma.08G189800"), "A");
+        // query.addConstraint(Constraints.isNotNull("Gene.description"), "B");
+        // // Specify how these constraints should be combined.
+        // query.setConstraintLogic("A and B");
+	
+	/**
+         * The PathQuery that returns similar genes, defined in this case as genes in the same gene family.
          */
-        private PathQuery getHomologueQuery(Mine mine, ObjectRequest req) {
+        private PathQuery getGeneFamilyQuery(Mine mine, ObjectRequest req) {
             PathQuery q = new PathQuery(mine.getModel());
-            q.addViews(
-                "Gene.geneFamily.genes.primaryIdentifier",
-                "Gene.geneFamily.genes.symbol",
-                "Gene.geneFamily.genes.organism.shortName"
-            );
-            q.addOrderBy("Gene.geneFamily.genes.organism.shortName", OrderDirection.ASC);
-            q.addConstraint(Constraints.lookup("Gene", req.getIdentifier(), req.getDomain()));
-            return q;
+            q.addViews("Gene.primaryIdentifier",
+		       "Gene.secondaryIdentifier",
+		       "Gene.organism.shortName");
+	    q.addOrderBy("Gene.primaryIdentifier", OrderDirection.ASC);
+	    q.addConstraint(Constraints.eq("Gene.geneFamily.genes.primaryIdentifier", req.getIdentifier()), "A");
+	    // non-null description forces genes that the mine "specializes in"
+	    q.addConstraint(Constraints.isNotNull("Gene.description"), "B");
+	    q.setConstraintLogic("A and B");
+	    return q;
         }
 
         /**
-         * Processes the results of queries produced by getHomologueQuery - ie. they
+         * Processes the results of queries produced by getGeneFamilyQuery - ie. they
          * have two views: Gene.primaryIdentifier, Organism.shortName
          * @param mine The data source
          * @param q The query
          * @return
          */
-        private Map<String, Set<ObjectDetails>> runQuery(
-                Mine mine,
-                PathQuery q) {
-            Map<String, Set<ObjectDetails>> retval = new HashMap<String, Set<ObjectDetails>>();
+        private Map<String, Set<ObjectDetails>> runQuery(Mine mine, PathQuery q) {
+
+	    Map<String, Set<ObjectDetails>> retval = new HashMap<String, Set<ObjectDetails>>();
 
             List<List<Object>> results = mine.getRows(q);
 
@@ -203,7 +219,7 @@ public final class FriendlyMineLinkGenerator implements InterMineLinkGenerator {
         private PathQuery getGeneQuery(Mine mine, ObjectRequest req) {
             PathQuery q = new PathQuery(mine.getModel());
             q.addViews("Gene.primaryIdentifier", "Gene.organism.shortName");
-            q.addOrderBy("Gene.symbol", OrderDirection.ASC);
+            q.addOrderBy("Gene.primaryIdentifier", OrderDirection.ASC);
             q.addConstraint(Constraints.lookup("Gene", req.getIdentifier(), req.getDomain()));
             return q;
         }

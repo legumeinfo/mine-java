@@ -3,7 +3,7 @@ package org.ncgr.intermine.bio.web.displayer;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.LinkedList;
+import java.util.ArrayList;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -57,33 +57,29 @@ public class GWASDisplayer extends ReportDisplayer {
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
 
-        // get the markers and phenotypes from the GWASResults
-        Map<String,String> markerChromosomeMap = new LinkedHashMap<String,String>();
-        Map<String,Integer> chromosomeLengthMap = new LinkedHashMap<String,Integer>();
-        Map<String,Integer> markerStartMap = new LinkedHashMap<String,Integer>();
-        Map<String,Integer> markerEndMap = new LinkedHashMap<String,Integer>();
-        Map<String,String> markerPhenotypeMap = new LinkedHashMap<String,String>();
-        Map<String,Double> markerPvalueMap = new LinkedHashMap<String,Double>();
-        // GWASResult.marker.primaryIdentifier,            // 0
-        // GWASResult.marker.chromosome.primaryIdentifier, // 1
-        // GWASResult.marker.chromosome.length,            // 2
-        // GWASResult.marker.chromosomeLocation.start,     // 3
-        // GWASResult.marker.chromosomeLocation.end,       // 4
-        // GWASResult.phenotype.primaryIdentifier,         // 5
-        // GWASResult.pValue                               // 6
-        PathQuery query = new PathQuery(im.getModel());
+        // store the GWASResults in maps
+	Map<String,Double> resultPValueMap = new LinkedHashMap<>();
+	Map<String,String> resultPhenotypeMap = new LinkedHashMap<>();
+	Map<String,String> resultMarkerMap = new LinkedHashMap<>();
+        Map<String,String> markerChromosomeMap = new LinkedHashMap<>();
+        Map<String,Integer> markerStartMap = new LinkedHashMap<>();
+        Map<String,Integer> markerEndMap = new LinkedHashMap<>();
+        Map<String,Integer> chromosomeLengthMap = new LinkedHashMap<>();
+
+	PathQuery query = new PathQuery(im.getModel());
         query.addViews(
-                       "GWASResult.marker.primaryIdentifier",            // 0
-                       "GWASResult.marker.chromosome.primaryIdentifier", // 1
-                       "GWASResult.marker.chromosome.length",            // 2
-                       "GWASResult.marker.chromosomeLocation.start",     // 3
-                       "GWASResult.marker.chromosomeLocation.end",       // 4
-                       "GWASResult.phenotype.primaryIdentifier",         // 5
-                       "GWASResult.pValue"                               // 6
+		       "GWASResult.identifier",                            // 0
+                       "GWASResult.pValue",                                // 1
+                       "GWASResult.phenotype.primaryIdentifier",           // 2
+                       "GWASResult.marker.primaryIdentifier",              // 3
+                       "GWASResult.marker.chromosome.secondaryIdentifier", // 4
+                       "GWASResult.marker.chromosome.length",              // 5
+                       "GWASResult.marker.chromosomeLocation.start",       // 6
+                       "GWASResult.marker.chromosomeLocation.end"          // 7
                        );
-        query.addConstraint(Constraints.eq("GWASResult.study.primaryIdentifier", gwasIdentifier));
-        query.addOrderBy("GWASResult.marker.chromosome.primaryIdentifier", OrderDirection.ASC);
-        query.addOrderBy("GWASResult.marker.primaryIdentifier", OrderDirection.ASC);
+        query.addConstraint(Constraints.eq("GWASResult.gwas.primaryIdentifier", gwasIdentifier));
+        query.addOrderBy("GWASResult.marker.chromosome.secondaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("GWASResult.marker.secondaryIdentifier", OrderDirection.ASC);
         ExportResultsIterator results;
         try {
             results = executor.execute(query);
@@ -92,35 +88,42 @@ public class GWASDisplayer extends ReportDisplayer {
         }
         while (results.hasNext()) {
             List<ResultElement> row = results.next();
-            String markerIdentifier = (String) row.get(0).getField();
-            String chromosomeIdentifier = (String) row.get(1).getField();
-            Integer chromosomeLength = (Integer) row.get(2).getField();
-            Integer markerStart = (Integer) row.get(3).getField();
-            Integer markerEnd = (Integer) row.get(4).getField();
-            String phenotypeIdentifier = (String) row.get(5).getField();
-            Double pValue = (Double) row.get(6).getField();
-            markerChromosomeMap.put(markerIdentifier, chromosomeIdentifier);
-            chromosomeLengthMap.put(chromosomeIdentifier, chromosomeLength);
-            markerStartMap.put(markerIdentifier, markerStart);
-            markerEndMap.put(markerIdentifier, markerEnd);
-            markerPhenotypeMap.put(markerIdentifier, phenotypeIdentifier);
-            markerPvalueMap.put(markerIdentifier, pValue);
+	    String resultIdentifier = (String) row.get(0).getField();       // GWASResult.identifier
+            Double pValue = (Double) row.get(1).getField();                 // GWASResult.pValue
+            String phenotypeIdentifier = (String) row.get(2).getField();    // GWASResult.phenotype.primaryIdentifier
+            String markerIdentifier = (String) row.get(3).getField();       // GWASResult.marker.secondaryIdentifier
+            String chromosomeIdentifier = (String) row.get(4).getField();   // GWASResult.marker.chromosome.secondaryIdentifier
+            Integer chromosomeLength = (Integer) row.get(5).getField();     // GWASResult.marker.chromosome.length
+            Integer markerStart = (Integer) row.get(6).getField();          // GWASResult.marker.chromosomeLocation.start
+            Integer markerEnd = (Integer) row.get(7).getField();            // GWASResult.marker.chromosomeLocation.end
+	    resultPValueMap.put(resultIdentifier, pValue);
+	    resultPhenotypeMap.put(resultIdentifier, phenotypeIdentifier);
+	    resultMarkerMap.put(resultIdentifier, markerIdentifier);
+	    markerChromosomeMap.put(markerIdentifier, chromosomeIdentifier);
+	    markerStartMap.put(markerIdentifier, markerStart);
+	    markerEndMap.put(markerIdentifier, markerEnd);
+	    chromosomeLengthMap.put(chromosomeIdentifier, chromosomeLength);
         }
 
-        // form the JSON for the displayer
-        String[] smps = { "markerPosition", "log10pValue" };
-        Map<String,Object> smpsMap = new LinkedHashMap<String,Object>();
+        // form the maps for the y attribute JSON
+        Map<String,Object> smpsMap = new LinkedHashMap<>();
+        List<String> smps = new ArrayList<>();
+	smps.add("markerPosition");
+	smps.add("log10pValue");
         smpsMap.put("smps", smps);
 
-        List<String> vars = new LinkedList<String>();
-        for (String markerIdentifier : markerChromosomeMap.keySet()) {
-            vars.add(markerIdentifier);
+        Map<String,Object> varsMap = new LinkedHashMap<>();
+        List<String> vars = new ArrayList<>();
+        for (String resultIdentifier : resultPValueMap.keySet()) {
+            vars.add(resultMarkerMap.get(resultIdentifier));
         }
-        Map<String,Object> varsMap = new LinkedHashMap<String,Object>();
-        varsMap.put("vars", vars);
+	varsMap.put("vars", vars);
 
-        List<Object> data = new LinkedList<Object>();
-        for (String markerIdentifier : markerChromosomeMap.keySet()) {
+        Map<String,Object> dataMap = new LinkedHashMap<>();
+        List<Object> data = new ArrayList<>();
+        for (String resultIdentifier : resultPValueMap.keySet()) {
+	    double pValue = resultPValueMap.get(resultIdentifier);
+	    String markerIdentifier = resultMarkerMap.get(resultIdentifier);
             String chromosomeIdentifier = markerChromosomeMap.get(markerIdentifier);
             int chromosomeLength = chromosomeLengthMap.get(chromosomeIdentifier);
             // assume chromosome name ends in NN so we can get a number
@@ -129,36 +132,39 @@ public class GWASDisplayer extends ReportDisplayer {
             int markerStart = markerStartMap.get(markerIdentifier);
             double frac = (double) markerStart / (double) chromosomeLength;
             double markerPosition = (double) (chromosomeNumber-1) + frac;
-            double log10pValue = -Math.log10((double) markerPvalueMap.get(markerIdentifier));
+            double log10pValue = -Math.log10(pValue);
             double[] values = { markerPosition, log10pValue };
             data.add(values);
         }
-        Map<String,Object> dataMap = new LinkedHashMap<String,Object>();
         dataMap.put("data", data);
 
-        Map<String,Object> yMap = new LinkedHashMap<String,Object>();
+	// form the JSON for the y attribute
+        Map<String,Object> yMap = new LinkedHashMap<>();
         yMap.put("smps", smps);
         yMap.put("vars", vars);
         yMap.put("data", data);
         JSONObject y = new JSONObject(yMap);
 
-        // decorative markers show the markers :)
-        String[] samples = {"markerPosition","log10pValue"};
-        List<Map<String,Object>> markerList = new LinkedList<Map<String,Object>>();
-        for (String marker : markerPhenotypeMap.keySet()) {
-            String phenotype = markerPhenotypeMap.get(marker);
-            Map<String,Object> markerMap = new LinkedHashMap<String,Object>();
-            markerMap.put("variable", marker);
-            markerMap.put("text", phenotype);
-            markerMap.put("type", "text");
-            markerMap.put("sample", samples);
-            markerList.add(markerMap);
+        // form the decoration markers JSON
+        Map<String,Object> markerMap = new LinkedHashMap<>();
+	List<String> samples = new ArrayList<>();
+	samples.add("markerPosition");
+	samples.add("log10pValue");
+        List<Map<String,Object>> markerList = new ArrayList<>();
+        for (String resultIdentifier : resultPValueMap.keySet()) {
+            Map<String,Object> resultMap = new LinkedHashMap<>();
+            resultMap.put("variable", resultMarkerMap.get(resultIdentifier));
+            resultMap.put("text", resultIdentifier);
+            resultMap.put("type", "text");
+            resultMap.put("sample", samples);
+            markerList.add(resultMap);
         }
-        Map<String,Object> markerMap = new LinkedHashMap<String,Object>();
+	boolean hasMarkers = markerList.size()>0;
         markerMap.put("marker", markerList);
         JSONObject markers = new JSONObject(markerMap);
-        
+
         // send the data on its way
+	request.setAttribute("hasMarkers", String.valueOf(hasMarkers));
         request.setAttribute("y", y.toString());
         request.setAttribute("markers", markers.toString());
     }
