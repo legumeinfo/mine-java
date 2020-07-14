@@ -71,7 +71,7 @@ public class GWASDisplayer extends ReportDisplayer {
 		       "GWASResult.identifier",                            // 0
                        "GWASResult.pValue",                                // 1
                        "GWASResult.phenotype.primaryIdentifier",           // 2
-                       "GWASResult.marker.primaryIdentifier",              // 3
+                       "GWASResult.marker.primaryIdentifier",            // 3
                        "GWASResult.marker.chromosome.secondaryIdentifier", // 4
                        "GWASResult.marker.chromosome.length",              // 5
                        "GWASResult.marker.chromosomeLocation.start",       // 6
@@ -79,7 +79,7 @@ public class GWASDisplayer extends ReportDisplayer {
                        );
         query.addConstraint(Constraints.eq("GWASResult.gwas.primaryIdentifier", gwasIdentifier));
         query.addOrderBy("GWASResult.marker.chromosome.secondaryIdentifier", OrderDirection.ASC);
-        query.addOrderBy("GWASResult.marker.secondaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("GWASResult.marker.primaryIdentifier", OrderDirection.ASC);
         ExportResultsIterator results;
         try {
             results = executor.execute(query);
@@ -91,7 +91,7 @@ public class GWASDisplayer extends ReportDisplayer {
 	    String resultIdentifier = (String) row.get(0).getField();       // GWASResult.identifier
             Double pValue = (Double) row.get(1).getField();                 // GWASResult.pValue
             String phenotypeIdentifier = (String) row.get(2).getField();    // GWASResult.phenotype.primaryIdentifier
-            String markerIdentifier = (String) row.get(3).getField();       // GWASResult.marker.secondaryIdentifier
+            String markerIdentifier = (String) row.get(3).getField();       // GWASResult.marker.primaryIdentifier
             String chromosomeIdentifier = (String) row.get(4).getField();   // GWASResult.marker.chromosome.secondaryIdentifier
             Integer chromosomeLength = (Integer) row.get(5).getField();     // GWASResult.marker.chromosome.length
             Integer markerStart = (Integer) row.get(6).getField();          // GWASResult.marker.chromosomeLocation.start
