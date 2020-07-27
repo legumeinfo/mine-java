@@ -1,7 +1,5 @@
 package org.ncgr.intermine.bio.web.displayer;
 
-import org.ncgr.intermine.web.ExpressionValue;
-
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -119,7 +117,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
 
             // query the expression values for this source and gene, put them in a list
             PathQuery valuesQuery = queryExpressionValuesForGene(model, source, geneID);
-            List<ExpressionValue> expressionValues = new LinkedList<ExpressionValue>();
+            List<ExprValue> exprValues = new LinkedList<ExprValue>();
             ExportResultsIterator valuesResult;
             try {
                 valuesResult = executor.execute(valuesQuery);
@@ -131,8 +129,8 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
                 Integer num = (Integer) row.get(0).getField();        // 0 Gene.expressionValues.sample.num
                 String condition = (String) row.get(1).getField();    // 1 Gene.expressionValues.sample.primaryIdentifier
                 Double value = (Double) row.get(2).getField();        // 2 Gene.expressionValues.value
-                ExpressionValue eval = new ExpressionValue(condition, num, value, geneID);
-                expressionValues.add(eval);
+                ExprValue eval = new ExprValue(condition, num, value, geneID);
+                exprValues.add(eval);
             }
 
             // canvasXpress "vars" = conditions
@@ -141,8 +139,8 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
             smps.add(geneID);
             double[][] data = new double[1][conditions.size()];
             for (int j=0; j<conditions.size(); j++) {
-                if (expressionValues.get(j)!=null) {
-                    data[0][j] = (double) expressionValues.get(j).getValue();
+                if (exprValues.get(j)!=null) {
+                    data[0][j] = (double) exprValues.get(j).value;
                 } else {
                     data[0][j] = 0.0;
                 }
@@ -244,4 +242,19 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
         return query;
     }
 
+    /**
+     * Expression value container.
+     */
+    private class ExprValue {
+        String sample;
+        int num;
+        double value;
+        String featureId;
+        ExprValue(String sample, int num, double value, String featureId) {
+            this.sample = sample;
+            this.num = num;
+            this.value = value;
+            this.featureId = featureId;
+        }
+    }
 }

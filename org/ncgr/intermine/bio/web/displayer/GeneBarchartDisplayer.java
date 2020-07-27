@@ -1,7 +1,5 @@
 package org.ncgr.intermine.bio.web.displayer;
 
-import org.ncgr.intermine.web.ExpressionValue;
-
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,7 +13,9 @@ import org.intermine.api.results.ExportResultsIterator;
 import org.intermine.api.results.ResultElement;
 
 import org.intermine.metadata.Model;
+
 import org.intermine.model.InterMineObject;
+import org.intermine.model.bio.ExpressionValue;
 
 import org.intermine.objectstore.ObjectStoreException;
 
@@ -65,7 +65,6 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         // query the sources, since we may have more than one, put them in a list of JSONs
         List<String> sources = new LinkedList<String>();
         List<String> sourcesJSON = new LinkedList<String>();
-        Map<String,String> sourcesUnit = new LinkedHashMap<String,String>();
         PathQuery sourcesQuery = querySources(model, geneID);
         ExportResultsIterator sourcesResult;
         try {
@@ -78,18 +77,14 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             if (row==null || row.get(0)==null || row.get(0).getField()==null) {
                 throw new RuntimeException("Null row or row element retrieving samples.");
             } else {
-                Integer id = (Integer)row.get(0).getField();              // 0 ExpressionValue.sample.source.id
-                String primaryIdentifier = (String)row.get(1).getField(); // 1 ExpressionValue.sample.source.primaryIdentifier
-                String unit = (String)row.get(2).getField();              // 2 ExpressionValue.sample.source.unit
+                Integer id = (Integer)row.get(0).getField();       // 0 ExpressionValue.sample.source.id
+                String identifier = (String)row.get(1).getField(); // 1 ExpressionValue.sample.source.identifier
                 // load out stuff
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
                 jsonMap.put("id", id);
-                jsonMap.put("primaryIdentifier", primaryIdentifier);
-                // jsonMap.put("description", description);
-                jsonMap.put("unit", unit);
-                sources.add(primaryIdentifier);
+                jsonMap.put("identifier", identifier);
+                sources.add(identifier);
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
-                sourcesUnit.put(primaryIdentifier, unit);
             }
         }
 
@@ -131,7 +126,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
 
             // query the expression values for this source and gene, put them in a list
             PathQuery valuesQuery = queryExpressionValuesForGene(model, source, geneID);
-            List<ExpressionValue> expressionValues = new LinkedList<ExpressionValue>();
+            List<ExprValue> exprValues = new LinkedList<ExprValue>();
             ExportResultsIterator valuesResult;
             try {
                 valuesResult = executor.execute(valuesQuery);
@@ -143,12 +138,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 Integer num = (Integer) row.get(0).getField();        // 0 Gene.expressionValues.sample.num
                 String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.primaryIdentifier
                 Double value = (Double) row.get(2).getField();        // 2 Gene.expressionValues.value
-                ExpressionValue eval = new ExpressionValue(sample, num, value, geneID);
-                expressionValues.add(eval);
+                ExprValue eval = new ExprValue(sample, num, value, geneID);
+                exprValues.add(eval);
             }
 
             // if no expression values for this gene return an empty JSON string and bail
-            if (expressionValues.size()==0) {
+            if (exprValues.size()==0) {
                 request.setAttribute("expressionValueJSON", "{}");
                 return;
             }
@@ -157,15 +152,11 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             List<String> vars = new LinkedList<String>();
             vars.add(geneID);
             
-            // canvasXpress "desc" = unit (just one)
-            List<String> desc = new LinkedList<String>();
-            desc.add(sourcesUnit.get(source));
-
             // canvasXpress "data"
             double[][] data = new double[1][samples.size()];
             for (int j=0; j<samples.size(); j++) {
-                if (expressionValues.get(j)!=null) {
-                    data[0][j] = (double) expressionValues.get(j).getValue();
+                if (exprValues.get(j)!=null) {
+                    data[0][j] = (double) exprValues.get(j).value;
                 } else {
                     data[0][j] = 0.0;
                 }
@@ -175,7 +166,6 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             Map<String, Object> yInBarchartData =  new LinkedHashMap<String, Object>();
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
-            yInBarchartData.put("desc", desc);
             yInBarchartData.put("data", data);
             
             Map<String, Object> barchartData = new LinkedHashMap<String, Object>();
@@ -202,7 +192,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve expression sources associated with the given gene, alphabetically by ExpressionSource.primaryIdentifier.
+     * Create a path query to retrieve expression sources associated with the given gene, alphabetically by ExpressionSource.identifier.
      *
      * @param model the model
      * @param geneID the gene for which sources are queried
@@ -211,10 +201,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     private PathQuery querySources(Model model, String geneID) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionValue.sample.source.id");                // 0
-        query.addView("ExpressionValue.sample.source.primaryIdentifier"); // 1
-        query.addView("ExpressionValue.sample.source.unit");              // 2
-        query.addConstraint(Constraints.eq("ExpressionValue.gene.primaryIdentifier", geneID));
-        query.addOrderBy("ExpressionValue.sample.source.primaryIdentifier", OrderDirection.ASC);
+        query.addView("ExpressionValue.sample.source.identifier");        // 1
+        query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
+        query.addOrderBy("ExpressionValue.sample.source.identifier", OrderDirection.ASC);
         return query;
     }
 
@@ -229,7 +218,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier"); // 0
         query.addView("ExpressionSample.description");       // 1
-        query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
+        query.addConstraint(Constraints.eq("ExpressionSample.source.identifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
     }
@@ -253,8 +242,25 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         // Add orderby
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
-        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
-        query.addConstraint(Constraints.eq("ExpressionValue.gene.primaryIdentifier", geneID));
+        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.identifier", source));
+        query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
         return query;
+    }
+
+    
+    /**
+     * Expression value container.
+     */
+    private class ExprValue {
+        String sample;
+        int num;
+        double value;
+        String featureId;
+        ExprValue(String sample, int num, double value, String featureId) {
+            this.sample = sample;
+            this.num = num;
+            this.value = value;
+            this.featureId = featureId;
+        }
     }
 }

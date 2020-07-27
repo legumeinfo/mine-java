@@ -65,7 +65,6 @@ public class GWASDisplayer extends ReportDisplayer {
         Map<String,Integer> markerStartMap = new LinkedHashMap<>();
         Map<String,Integer> markerEndMap = new LinkedHashMap<>();
         Map<String,Integer> chromosomeLengthMap = new LinkedHashMap<>();
-
 	PathQuery query = new PathQuery(im.getModel());
         query.addViews(
 		       "GWASResult.identifier",                            // 0

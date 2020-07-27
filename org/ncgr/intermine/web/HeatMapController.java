@@ -147,7 +147,7 @@ public class HeatMapController extends TilesAction {
             }
             
             // query the expression values for this source and gene bag
-            Map<String, List<ExpressionValue>> expressionValueMap = new LinkedHashMap<String, List<ExpressionValue>>();
+            Map<String, List<ExprValue>> expressionValueMap = new LinkedHashMap<String, List<ExprValue>>();
             PathQuery valuesQuery = queryExpressionValues(model, source, bag);
             ExportResultsIterator valuesResult;
             try {
@@ -161,10 +161,10 @@ public class HeatMapController extends TilesAction {
 		Integer num = (Integer) valueRow.get(1).getField();  // 1 ExpressionValue.sample.num
                 String sample = (String) valueRow.get(2).getField(); // 2 ExpressionValue.sample.primaryIdentifier
 		Double value = (Double) valueRow.get(3).getField();  // 3 ExpressionValue.value
-                ExpressionValue expValue = new ExpressionValue(sample, num, value, geneID);
+                ExprValue expValue = new ExprValue(sample, num, value, geneID);
                 if (!expressionValueMap.containsKey(geneID)) {
                     // create a new list with space for n (size of samples) ExpressionValues
-                    List<ExpressionValue> expressionValueList = new ArrayList<ExpressionValue>(Collections.nCopies(samples.size(), new ExpressionValue()));
+                    List<ExprValue> expressionValueList = new ArrayList<ExprValue>(Collections.nCopies(samples.size(), new ExprValue()));
                     expressionValueList.set(samples.indexOf(sample), expValue);
                     expressionValueMap.put(geneID, expressionValueList);
                 } else {
@@ -198,8 +198,8 @@ public class HeatMapController extends TilesAction {
                 for (int j=0; j<genes.size(); j++) {
                     String gene = genes.get(j);
                     for (int i=0; i<samples.size(); i++) {
-                        if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null && expressionValueMap.get(gene).get(i).getValue()!=null) {
-                            data[i][j] = (double) expressionValueMap.get(gene).get(i).getValue();
+                        if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null) {
+                            data[i][j] = (double) expressionValueMap.get(gene).get(i).value;
                         } else {
                             data[i][j] = 0.0;
                         }
@@ -214,8 +214,8 @@ public class HeatMapController extends TilesAction {
                     String gene1 = genes.get(j);
                     double[] values1 = new double[samples.size()];
                     for (int i=0; i<samples.size(); i++) {
-                        if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null && expressionValueMap.get(gene1).get(i).getValue()!=null) {
-                            values1[i] = (double) expressionValueMap.get(gene1).get(i).getValue();
+                        if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null) {
+                            values1[i] = (double) expressionValueMap.get(gene1).get(i).value;
                         }
                     }
                     double totalCorr = 0.0;
@@ -225,8 +225,8 @@ public class HeatMapController extends TilesAction {
                             String gene2 = genes.get(k);
                             double[] values2 = new double[samples.size()];
                             for (int i=0; i<samples.size(); i++) {
-                                if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null && expressionValueMap.get(gene2).get(i).getValue()!=null) {
-                                    values2[i] = (double) expressionValueMap.get(gene2).get(i).getValue();
+                                if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null) {
+                                    values2[i] = (double) expressionValueMap.get(gene2).get(i).value;
                                 }
                             }
                             double corr = pCorr.correlation(values1, values2);
@@ -380,4 +380,21 @@ public class HeatMapController extends TilesAction {
         request.setAttribute("errorMessage", errorMessage);
     }
 
+    /**
+     * Expression value container.
+     */
+    private class ExprValue {
+        String sample;
+        int num;
+        double value;
+        String featureId;
+        ExprValue() {
+        }
+        ExprValue(String sample, int num, double value, String featureId) {
+            this.sample = sample;
+            this.num = num;
+            this.value = value;
+            this.featureId = featureId;
+        }
+    }
 }
