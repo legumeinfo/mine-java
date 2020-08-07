@@ -69,6 +69,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             Integer lgId = (Integer) row.get(0).getField();
             String lgIdentifier = (String) row.get(1).getField();
             double length = (double) (Double) row.get(2).getField();
+            int number = (int) (Integer) row.get(3).getField();
             lgMap.put(lgId, row);
             if (length>maxLGLength) maxLGLength = length;
         }
@@ -93,7 +94,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             markerMap.put(lgId, markers);
         }
 
-        // get the QTLs per linkage group
+        // get the QTL ids per linkage group
         Map<Integer, Map<Integer,List<ResultElement>>> qtlMap = new LinkedHashMap<Integer,Map<Integer,List<ResultElement>>>();
         for (Integer lgId : lgMap.keySet()) {
             PathQuery qtlQuery = getQTLQuery(im.getModel(), (int)lgId);
@@ -115,7 +116,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             // the data
             List<ResultElement> lgRow = lgMap.get(lgId);
             int lgRowId = (int) (Integer) lgRow.get(0).getField();
-            String lgPrimaryId = (String) lgRow.get(1).getField();
+            String lgIdentifier = (String) lgRow.get(1).getField();
             double[] length = new double[2];
             length[0] = 0.0;
             length[1] = (double) (Double) lgRow.get(2).getField();
@@ -126,7 +127,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             List<Object> lgDataArray = new LinkedList<Object>();
             // the single data item
             Map<String,Object> lgData = new LinkedHashMap<String,Object>();
-            lgData.put("id", lgPrimaryId);
+            lgData.put("id", lgIdentifier);
             lgData.put("key", lgId); // for linking
             lgData.put("fill", "purple");
             lgData.put("outline", "black");
@@ -148,11 +149,11 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
                 // the data
                 List<ResultElement> markerRow = markers.get(markerId);
                 int markerRowId = (int) (Integer) markerRow.get(0).getField();
-                String markerPrimaryId = (String) markerRow.get(1).getField();
+                String markerIdentifier = (String) markerRow.get(1).getField();
                 double position = (double) (Double) markerRow.get(2).getField();
                 // the track data
                 Map<String,Object> markerData = new LinkedHashMap<String,Object>();
-                markerData.put("id", markerPrimaryId);
+                markerData.put("id", markerIdentifier);
                 markerData.put("key", markerId); // for linking
                 markerData.put("fill", "darkred");
                 markerData.put("outline", "black");
@@ -172,13 +173,13 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
                 // the data
                 List<ResultElement> qtlRow = qtls.get(qtlId);
                 int qtlRowId = (int) (Integer) qtlRow.get(0).getField();
-                String qtlPrimaryId = (String) qtlRow.get(1).getField();
+                String qtlIdentifier = (String) qtlRow.get(1).getField();
                 double[] span = new double[2];
-                span[0] = (double) (Double) qtlRow.get(2).getField();
-                span[1] = (double) (Double) qtlRow.get(3).getField();
+                span[0] = (double) (Double) qtlRow.get(2).getField(); // QTL.start
+                span[1] = (double) (Double) qtlRow.get(3).getField(); // QTL.end
                 // the track data
                 Map<String,Object> qtlData = new LinkedHashMap<String,Object>();
-                qtlData.put("id", qtlPrimaryId); // canvasXpress needs it to be called "id"
+                qtlData.put("id", qtlIdentifier); // canvasXpress needs it to be called "id"
                 qtlData.put("key", qtlId); // for linking
                 qtlData.put("fill", "yellow");
                 qtlData.put("outline", "black");
@@ -190,7 +191,6 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
             }
             qtlsTrack.put("data", qtlsDataArray);
             trackData.add(qtlsTrack);
-                        
         }
 
         // output scalar vars
@@ -208,15 +208,16 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
      * Create a path query to retrieve linkage groups associated with a given genetic map, QTL or even a single linkage group Id.
      *
      * @param model the model
-     * @param gmPI  the genetic map primary identifier
+     * @param gmPI  the genetic map IM id
      * @param objectName the name of the report object, i.e. GeneticMap, QTL, LinkageGroup
      * @return the path query
      */
     PathQuery getLinkageGroupQuery(Model model, int reportId, String objectName) {
         PathQuery query = new PathQuery(model);
         query.addViews("LinkageGroup.id",
-                       "LinkageGroup.primaryIdentifier",
-                       "LinkageGroup.length"
+                       "LinkageGroup.identifier",
+                       "LinkageGroup.length",
+                       "LinkageGroup.number"
                        );
         if (objectName.equals("GeneticMap")) {
             query.addConstraint(Constraints.eq("LinkageGroup.geneticMap.id", String.valueOf(reportId)));
@@ -240,7 +241,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
     PathQuery getGeneticMarkerQuery(Model model, int lgId) {
         PathQuery query = new PathQuery(model);
         query.addViews("GeneticMarker.id",
-                       "GeneticMarker.primaryIdentifier",
+                       "GeneticMarker.secondaryIdentifier",
                        "GeneticMarker.linkageGroupPositions.position"
                        );
         query.addConstraint(Constraints.eq("GeneticMarker.linkageGroupPositions.linkageGroup.id", String.valueOf(lgId)));
@@ -258,12 +259,12 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
     PathQuery getQTLQuery(Model model, int lgId) {
         PathQuery query = new PathQuery(model);
         query.addViews("QTL.id",
-                       "QTL.primaryIdentifier",
-                       "QTL.linkageGroupRanges.begin",
-                       "QTL.linkageGroupRanges.end"
+                       "QTL.identifier",
+                       "QTL.start",
+                       "QTL.end"
                        );
-        query.addConstraint(Constraints.eq("QTL.linkageGroupRanges.linkageGroup.id", String.valueOf(lgId)));
-        query.addOrderBy("QTL.linkageGroupRanges.begin", OrderDirection.ASC);
+        query.addConstraint(Constraints.eq("QTL.linkageGroup.id", String.valueOf(lgId)));
+        query.addOrderBy("QTL.start", OrderDirection.ASC);
         return query;
     }
 

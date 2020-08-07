@@ -70,9 +70,10 @@ public class GeneticMapDisplayer extends ReportDisplayer {
         while (lgResult.hasNext()) {
             List<ResultElement> row = lgResult.next();
             int id = (int) (Integer) row.get(0).getField();
-            String primaryIdentifier = (String) row.get(1).getField();
+            String identifier = (String) row.get(1).getField();
             double length = (double) (Double) row.get(2).getField();
-            LinkageGroup lg = new LinkageGroup(id, primaryIdentifier, length);
+            int number = (int) (Integer) row.get(3).getField();
+            LinkageGroup lg = new LinkageGroup(id, identifier, length, number);
             lgMap.put(id, lg);
             if ((double)length > maxLGLength) maxLGLength = (double)length;
         }
@@ -136,7 +137,7 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             List<Object> lgDataArray = new LinkedList<Object>();
             // the single data item
             Map<String,Object> lgData = new LinkedHashMap<String,Object>();
-            lgData.put("id", lg.primaryIdentifier);
+            lgData.put("id", lg.identifier);
             lgData.put("key", lg.id); // for linking
             lgData.put("fill", "purple");
             lgData.put("outline", "black");
@@ -216,11 +217,12 @@ public class GeneticMapDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         query.addViews(
                        "LinkageGroup.id",
-                       "LinkageGroup.primaryIdentifier",
-                       "LinkageGroup.length"
+                       "LinkageGroup.identifier",
+                       "LinkageGroup.length",
+                       "LinkageGroup.number"
                        );
         query.addConstraint(Constraints.eq("LinkageGroup.geneticMap.primaryIdentifier", gmPI));
-        query.addOrderBy("LinkageGroup.primaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("LinkageGroup.number", OrderDirection.ASC);
         return query;
     }
 
@@ -268,12 +270,14 @@ public class GeneticMapDisplayer extends ReportDisplayer {
      */
     public class LinkageGroup {
         public int id;
-        public String primaryIdentifier;
+        public String identifier;
         public double length;
-        public LinkageGroup(int id, String primaryIdentifier, double length) {
+        public int number;
+        public LinkageGroup(int id, String identifier, double length, int number) {
             this.id = id;
-            this.primaryIdentifier = primaryIdentifier;
+            this.identifier = identifier;
             this.length = length;
+            this.number = number;
         }
     }
 
