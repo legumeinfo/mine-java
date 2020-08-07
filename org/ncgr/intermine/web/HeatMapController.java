@@ -115,7 +115,7 @@ public class HeatMapController extends TilesAction {
                 throw new RuntimeException("Null row or row element retrieving sources.");
             }
             Integer id = (Integer)sourceRow.get(0).getField();    // 0 ExpressionValue.sample.source.id
-	    String source = (String)sourceRow.get(1).getField();  // 1 ExpressionValue.sample.source.primaryIdentifier
+	    String source = (String)sourceRow.get(1).getField();  // 1 ExpressionValue.sample.source.identifier
 	    String unit = (String)sourceRow.get(2).getField();    // 2 ExpressionValue.sample.source.unit
 
             // query samples and sample descriptions
@@ -189,7 +189,7 @@ public class HeatMapController extends TilesAction {
                 sources.add(source);
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
                 jsonMap.put("id", id);
-                jsonMap.put("primaryIdentifier", source);
+                jsonMap.put("identifier", source);
                 jsonMap.put("unit", unit);
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
@@ -292,7 +292,7 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve expression sources for the genes in the bag, alphabetically by ExpressionSource.primaryIdentifier.
+     * Create a path query to retrieve expression sources for the genes in the bag, alphabetically by ExpressionSource.identifier.
      *
      * @param model the model
      * @param bag   the bag o'genes
@@ -300,11 +300,11 @@ public class HeatMapController extends TilesAction {
      */
     PathQuery querySources(Model model, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionValue.sample.source.id");                // 0
-        query.addView("ExpressionValue.sample.source.primaryIdentifier"); // 1
-        query.addView("ExpressionValue.sample.source.unit");              // 2
+        query.addView("ExpressionValue.sample.source.id");           // 0
+        query.addView("ExpressionValue.sample.source.identifier");   // 1
+        query.addView("ExpressionValue.sample.source.unit");         // 2
         query.addConstraint(Constraints.in("ExpressionValue.gene", bag.getName()));
-        query.addOrderBy("ExpressionValue.sample.source.primaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.source.identifier", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Sources query invalid: "+verifyList);
         return query;
@@ -314,14 +314,14 @@ public class HeatMapController extends TilesAction {
      * Create a path query to retrieve the sample primaryIdentifiers and descriptions for a given source.
      *
      * @param model the model
-     * @param source the primaryIdentifier of the expression source
+     * @param source the identifier of the expression source
      * @return the path query
      */
     PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
         query.addView("ExpressionSample.description");
-        query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
+        query.addConstraint(Constraints.eq("ExpressionSample.source.identifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Samples query invalid: "+verifyList);
@@ -332,7 +332,7 @@ public class HeatMapController extends TilesAction {
      * Create a path query to retrieve gene expression values from a bag of genes for the given expression source.
      *
      * @param model  the model
-     * @param source the primaryIdentifier of the ExpressionSource
+     * @param source the identifier of the ExpressionSource
      * @param bag    the bag o'genes
      * @return the path query
      */
@@ -347,7 +347,7 @@ public class HeatMapController extends TilesAction {
 	query.addOrderBy("ExpressionValue.gene.secondaryIdentifier", OrderDirection.ASC);
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
         // Add source and bag constraints
-        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
+        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.identifier", source));
         query.addConstraint(Constraints.in("ExpressionValue.gene", bag.getName()));
 	query.addConstraint(Constraints.isNotNull("ExpressionValue.value"));
         List<String> verifyList = query.verifyQuery();

@@ -77,7 +77,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
             } else {
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
                 jsonMap.put("id", (Integer)row.get(0).getField());
-                jsonMap.put("primaryIdentifier", (String)row.get(1).getField());
+                jsonMap.put("identifier", (String)row.get(1).getField());
                 jsonMap.put("description",(String)row.get(2).getField());
                 jsonMap.put("unit",(String)row.get(3).getField());
                 sources.add((String)row.get(1).getField());
@@ -187,18 +187,18 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.primaryIdentifier.
+     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.identifier.
      *
      * @param model the model
      * @return the path query
      */
     private PathQuery querySources(Model model) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSource.id");                 // 0
-        query.addView("ExpressionSource.primaryIdentifier");  // 1  
-        query.addView("ExpressionSource.description");        // 2
-        query.addView("ExpressionSource.unit");               // 3
-        query.addOrderBy("ExpressionSource.primaryIdentifier", OrderDirection.ASC);
+        query.addView("ExpressionSource.id");          // 0
+        query.addView("ExpressionSource.identifier");  // 1  
+        query.addView("ExpressionSource.description"); // 2
+        query.addView("ExpressionSource.unit");        // 3
+        query.addOrderBy("ExpressionSource.identifier", OrderDirection.ASC);
         return query;
     }
 
@@ -206,13 +206,13 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
      * Create a path query to retrieve the conditions = ExpressionSample.primaryIdentifier.
      *
      * @param model the model
-     * @param source the primaryIdentifier of the expression source
+     * @param source the identifier of the expression source
      * @return the path query
      */
     private PathQuery queryConditions(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
-        query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
+        query.addConstraint(Constraints.eq("ExpressionSample.source.identifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
     }
@@ -221,7 +221,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
      * Create a path query to retrieve gene expression values from the given source for the given gene 
      *
      * @param model the model
-     * @param source the primaryIdentifier of the expression source
+     * @param source the identifier of the expression source
      * @param geneID the gene primaryIdentifier
      * @return the path query
      */
@@ -237,7 +237,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
         query.addOrderBy("Gene.expressionValues.sample.num", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
         query.addConstraint(Constraints.isNotNull("Gene.expressionValues.value"));
-        query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.primaryIdentifier", source));
+        query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.identifier", source));
         query.addConstraint(Constraints.eq("Gene.primaryIdentifier", geneID));
         return query;
     }

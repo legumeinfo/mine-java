@@ -52,7 +52,7 @@ public class GWASDisplayer extends ReportDisplayer {
         try {
             gwasIdentifier = (String) gwas.getFieldValue("primaryIdentifier");
         } catch (IllegalAccessException ex) {
-            throw new RuntimeException("Error getting primaryIdentifier.", ex);
+            throw new RuntimeException("Error getting GWAS.primaryIdentifier.", ex);
         }
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
@@ -125,9 +125,16 @@ public class GWASDisplayer extends ReportDisplayer {
 	    String markerIdentifier = resultMarkerMap.get(resultIdentifier);
             String chromosomeIdentifier = markerChromosomeMap.get(markerIdentifier);
             int chromosomeLength = chromosomeLengthMap.get(chromosomeIdentifier);
-            // assume chromosome name ends in NN so we can get a number
+            // get the chromosome number from the identifier Chr01 or Chr1
             int len = chromosomeIdentifier.length();
-            int chromosomeNumber = Integer.parseInt(chromosomeIdentifier.substring(len-2,len));
+            int chromosomeNumber = 0;
+            try {
+                // two digits?
+                chromosomeNumber = Integer.parseInt(chromosomeIdentifier.substring(len-2,len));
+            } catch (Exception e) {
+                // one digit?
+                chromosomeNumber = Integer.parseInt(chromosomeIdentifier.substring(len-1,len));
+            }
             int markerStart = markerStartMap.get(markerIdentifier);
             double frac = (double) markerStart / (double) chromosomeLength;
             double markerPosition = (double) (chromosomeNumber-1) + frac;
