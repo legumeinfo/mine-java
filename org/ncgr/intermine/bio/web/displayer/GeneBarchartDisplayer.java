@@ -15,7 +15,6 @@ import org.intermine.api.results.ResultElement;
 import org.intermine.metadata.Model;
 
 import org.intermine.model.InterMineObject;
-import org.intermine.model.bio.ExpressionValue;
 
 import org.intermine.objectstore.ObjectStoreException;
 
