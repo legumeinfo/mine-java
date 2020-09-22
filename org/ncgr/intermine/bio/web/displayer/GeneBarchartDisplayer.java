@@ -69,7 +69,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         try {
             sourcesResult = executor.execute(sourcesQuery);
         } catch (ObjectStoreException e) {
-            throw new RuntimeException("Error retrieving sources.", e);
+            // likely we don't have expression for this particular gene, so return empty values
+            request.setAttribute("sources", "");
+            request.setAttribute("sourcesJSON", "");
+            request.setAttribute("jsonList", "");
+            request.setAttribute("descriptionsList", "");
+            return;
         }
         while (sourcesResult.hasNext()) {
             List<ResultElement> row = sourcesResult.next();
@@ -187,7 +192,6 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
         request.setAttribute("descriptionsList", descriptionsList);
-
     }
 
     /**
