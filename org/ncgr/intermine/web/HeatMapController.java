@@ -1,7 +1,7 @@
 package org.ncgr.intermine.web;
 
 /*
- * Copyright (C) 2002-2014 FlyMine
+ * Copyright (C) 2020 NCGR
  *
  * This code may be freely distributed and modified under the
  * terms of the GNU Lesser General Public Licence.  This should
@@ -116,7 +116,6 @@ public class HeatMapController extends TilesAction {
             }
             Integer id = (Integer)sourceRow.get(0).getField();    // 0 ExpressionValue.sample.source.id
 	    String source = (String)sourceRow.get(1).getField();  // 1 ExpressionValue.sample.source.identifier
-	    String unit = (String)sourceRow.get(2).getField();    // 2 ExpressionValue.sample.source.unit
 
             // query samples and sample descriptions
             List<String> samples = new LinkedList<String>();
@@ -157,7 +156,7 @@ public class HeatMapController extends TilesAction {
             }
             while (valuesResult.hasNext()) {
                 List<ResultElement> valueRow = valuesResult.next();
-                String geneID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.gene.secondaryIdentifier
+                String geneID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.feature.secondaryIdentifier
 		Integer num = (Integer) valueRow.get(1).getField();  // 1 ExpressionValue.sample.num
                 String sample = (String) valueRow.get(2).getField(); // 2 ExpressionValue.sample.primaryIdentifier
 		Double value = (Double) valueRow.get(3).getField();  // 3 ExpressionValue.value
@@ -190,7 +189,7 @@ public class HeatMapController extends TilesAction {
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
                 jsonMap.put("id", id);
                 jsonMap.put("identifier", source);
-                jsonMap.put("unit", unit);
+                jsonMap.put("unit", "TPM");
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
                 // canvasXpress "data" = double[samples][genes]
@@ -302,8 +301,7 @@ public class HeatMapController extends TilesAction {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionValue.sample.source.id");           // 0
         query.addView("ExpressionValue.sample.source.identifier");   // 1
-        query.addView("ExpressionValue.sample.source.unit");         // 2
-        query.addConstraint(Constraints.in("ExpressionValue.gene", bag.getName()));
+        query.addConstraint(Constraints.in("ExpressionValue.feature", bag.getName()));
         query.addOrderBy("ExpressionValue.sample.source.identifier", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Sources query invalid: "+verifyList);
@@ -339,16 +337,16 @@ public class HeatMapController extends TilesAction {
     PathQuery queryExpressionValues(Model model, String source, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
         // Add views
-        query.addView("ExpressionValue.gene.secondaryIdentifier");   // 0
-	query.addView("ExpressionValue.sample.num");               // 1
-	query.addView("ExpressionValue.sample.primaryIdentifier"); // 2
-	query.addView("ExpressionValue.value");                    // 3
+        query.addView("ExpressionValue.feature.secondaryIdentifier"); // 0
+	query.addView("ExpressionValue.sample.num");                  // 1
+	query.addView("ExpressionValue.sample.primaryIdentifier");    // 2
+	query.addView("ExpressionValue.value");                       // 3
         // Add orderby
-	query.addOrderBy("ExpressionValue.gene.secondaryIdentifier", OrderDirection.ASC);
+	query.addOrderBy("ExpressionValue.feature.secondaryIdentifier", OrderDirection.ASC);
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
         // Add source and bag constraints
         query.addConstraint(Constraints.eq("ExpressionValue.sample.source.identifier", source));
-        query.addConstraint(Constraints.in("ExpressionValue.gene", bag.getName()));
+        query.addConstraint(Constraints.in("ExpressionValue.feature", bag.getName()));
 	query.addConstraint(Constraints.isNotNull("ExpressionValue.value"));
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Expression query invalid: "+verifyList);
