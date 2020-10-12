@@ -86,9 +86,9 @@ public class LinkageGroupDiagramController extends TilesAction {
         }
         while (lgResult.hasNext()) {
             List<ResultElement> row = lgResult.next();
-            String primaryIdentifier = (String) row.get(0).getField();
+            String identifier = (String) row.get(0).getField();
             Double length = (Double) row.get(1).getField();
-            lgMap.put(primaryIdentifier, length);
+            lgMap.put(identifier, length);
             if ((double)length > maxLGLength) maxLGLength = (double)length;
         }
 
@@ -125,11 +125,11 @@ public class LinkageGroupDiagramController extends TilesAction {
             Map<String,Double[]> qtls = new LinkedHashMap<String,Double[]>();
             while (qtlResult.hasNext()) {
                 List<ResultElement> row = qtlResult.next();
-                String primaryIdentifier = (String) row.get(0).getField();
+                String identifier = (String) row.get(0).getField();
                 Double[] span = new Double[2];
                 span[0] = (Double) row.get(1).getField();
                 span[1] = (Double) row.get(2).getField();
-                qtls.put(primaryIdentifier, span);
+                qtls.put(identifier, span);
             }
             qtlMap.put(lgPI, qtls);
         }
@@ -236,11 +236,11 @@ public class LinkageGroupDiagramController extends TilesAction {
      */
     private PathQuery queryLinkageGroup(Model model, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
-        query.addViews("LinkageGroup.primaryIdentifier",
+        query.addViews("LinkageGroup.identifier",
                        "LinkageGroup.length"
                        );
         query.addConstraint(Constraints.in("LinkageGroup", bag.getName()));
-        query.addOrderBy("LinkageGroup.primaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("LinkageGroup.identifier", OrderDirection.ASC);
         return query;
     }
 
@@ -248,7 +248,7 @@ public class LinkageGroupDiagramController extends TilesAction {
      * Create a path query to retrieve genetic markers associated with a given linkage group.
      *
      * @param model the model
-     * @param lgPI  the linkage group primaryIdentifier
+     * @param lgPI  the linkage group identifier
      * @return the path query
      */
     private PathQuery queryGeneticMarker(Model model, String lgPI) {
@@ -256,7 +256,7 @@ public class LinkageGroupDiagramController extends TilesAction {
         query.addViews("GeneticMarker.primaryIdentifier",
                        "GeneticMarker.linkageGroupPositions.position"
                        );
-        query.addConstraint(Constraints.eq("GeneticMarker.linkageGroupPositions.linkageGroup.primaryIdentifier", lgPI));
+        query.addConstraint(Constraints.eq("GeneticMarker.linkageGroupPositions.linkageGroup.identifier", lgPI));
         query.addOrderBy("GeneticMarker.linkageGroupPositions.position", OrderDirection.ASC);
         return query;
     }
@@ -265,17 +265,17 @@ public class LinkageGroupDiagramController extends TilesAction {
      * Create a path query to retrieve QTLs associated with a given linkage group.
      *
      * @param model the model
-     * @param lgPI  the linkage group primaryIdentifier
+     * @param lgPI  the linkage group identifier
      * @return the path query
      */
     private PathQuery queryQTL(Model model, String lgPI) {
         PathQuery query = new PathQuery(model);
-        query.addViews("QTL.primaryIdentifier",
-                       "QTL.linkageGroupRanges.begin",
-                       "QTL.linkageGroupRanges.end"
+        query.addViews("QTL.identifier",
+                       "QTL.start",
+                       "QTL.end"
                        );
-        query.addConstraint(Constraints.eq("QTL.linkageGroupRanges.linkageGroup.primaryIdentifier", lgPI));
-        query.addOrderBy("QTL.linkageGroupRanges.begin", OrderDirection.ASC);
+        query.addConstraint(Constraints.eq("QTL.linkageGroup.identifier", lgPI));
+        query.addOrderBy("QTL.start", OrderDirection.ASC);
         return query;
     }
 

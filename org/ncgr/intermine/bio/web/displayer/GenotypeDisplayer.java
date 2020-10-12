@@ -74,9 +74,9 @@ public class GenotypeDisplayer extends ReportDisplayer {
 
         // query the QTLs for this mapping population
         PathQuery qtlQuery = new PathQuery(im.getModel());
-        qtlQuery.addViews("GeneticMarker.QTLs.primaryIdentifier");
+        qtlQuery.addViews("GeneticMarker.QTLs.identifier");
         qtlQuery.addConstraint(Constraints.eq("GeneticMarker.mappingPopulations.primaryIdentifier", mappingPopulation));
-        qtlQuery.addOrderBy("GeneticMarker.QTLs.primaryIdentifier", OrderDirection.ASC);
+        qtlQuery.addOrderBy("GeneticMarker.QTLs.identifier", OrderDirection.ASC);
         ExportResultsIterator qtlResult = getResults(executor, qtlQuery);
         List<String> qtls = new ArrayList<String>();
         while (qtlResult.hasNext()) {

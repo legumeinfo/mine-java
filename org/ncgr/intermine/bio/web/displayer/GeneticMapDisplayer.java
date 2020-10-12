@@ -114,11 +114,11 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             while (qtlResult.hasNext()) {
                 List<ResultElement> row = qtlResult.next();
                 int id = (int) (Integer) row.get(0).getField();
-                String primaryIdentifier = (String) row.get(1).getField();
+                String identifier = (String) row.get(1).getField();
                 double[] span = new double[2];
                 span[0] = (double) (Double) row.get(2).getField();
                 span[1] = (double) (Double) row.get(3).getField();
-                QTL qtl = new QTL(id, primaryIdentifier, span);
+                QTL qtl = new QTL(id, identifier, span);
                 qtls.put(id, qtl);
             }
             qtlMap.put(lgID, qtls);
@@ -180,7 +180,7 @@ public class GeneticMapDisplayer extends ReportDisplayer {
             for (Integer qtlID : qtls.keySet()) {
                 QTL qtl = qtls.get(qtlID);
                 Map<String,Object> qtlData = new LinkedHashMap<String,Object>();
-                qtlData.put("id", qtl.primaryIdentifier);
+                qtlData.put("id", qtl.identifier);
                 qtlData.put("key", qtl.id); // for linking
                 qtlData.put("fill", "yellow");
                 qtlData.put("outline", "black");
@@ -256,12 +256,12 @@ public class GeneticMapDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         query.addViews(
                        "QTL.id",
-                       "QTL.primaryIdentifier",
-                       "QTL.linkageGroupRanges.begin",
-                       "QTL.linkageGroupRanges.end"
+                       "QTL.identifier",
+                       "QTL.start",
+                       "QTL.end"
                        );
-        query.addConstraint(Constraints.eq("QTL.linkageGroupRanges.linkageGroup.id", String.valueOf(lgID)));
-        query.addOrderBy("QTL.linkageGroupRanges.begin", OrderDirection.ASC);
+        query.addConstraint(Constraints.eq("QTL.linkageGroup.id", String.valueOf(lgID)));
+        query.addOrderBy("QTL.start", OrderDirection.ASC);
         return query;
     }
 
@@ -300,11 +300,11 @@ public class GeneticMapDisplayer extends ReportDisplayer {
      */
     public class QTL {
         public int id;
-        public String primaryIdentifier;
+        public String identifier;
         public double[] span;
-        public QTL(int id, String primaryIdentifier, double[] span) {
+        public QTL(int id, String identifier, double[] span) {
             this.id = id;
-            this.primaryIdentifier = primaryIdentifier;
+            this.identifier = identifier;
             this.span = span;
         }
     }
