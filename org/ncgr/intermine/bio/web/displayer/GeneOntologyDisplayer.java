@@ -111,9 +111,6 @@ public class GeneOntologyDisplayer extends ReportDisplayer
             }
 
             PathQuery query = buildQuery(model, new Integer(reportObject.getId()));
-            // DEBUG
-            System.out.println(query.toXml());
-            //
             ExportResultsIterator result;
             try {
                 result = executor.execute(query);
