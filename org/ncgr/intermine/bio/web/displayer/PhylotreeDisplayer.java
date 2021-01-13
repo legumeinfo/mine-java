@@ -3,6 +3,7 @@ package org.ncgr.intermine.bio.web.displayer;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
+import java.util.List;
 import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
@@ -27,13 +28,11 @@ import org.intermine.web.logic.results.ReportObject;
 import org.intermine.web.logic.session.SessionMethods;
 
 /**
- * Generates data for the phylotree displayer by grabbing the Newick file from the LIS datastore.
+ * Generates data for the phylotree displayer by grabbing the Newick data and sending it on.
  *
  * @author Sam Hokin
  */
 public class PhylotreeDisplayer extends ReportDisplayer {
-
-    final static String NEWICKDIR_PROPERTY = "genefamily.newick.location";
 
     /**
      * Construct with config and the InterMineAPI.
@@ -47,7 +46,7 @@ public class PhylotreeDisplayer extends ReportDisplayer {
 
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
-        // get the GeneFamily object
+        // get the GeneFamily or Phylotree object
         InterMineObject obj = reportObject.getObject();
         String objIdentifier;
         try {
@@ -56,25 +55,23 @@ public class PhylotreeDisplayer extends ReportDisplayer {
             throw new RuntimeException("Error getting identifier from reportObject.", ex);
         }
 
-        // get the location of Newick files
-        final Properties webProperties = SessionMethods.getWebProperties(request.getServletContext());
-        String newickDir = (String) webProperties.get(NEWICKDIR_PROPERTY);
-        if (newickDir==null) {
-            throw new RuntimeException("web.properties is missing location of Newick files:"+NEWICKDIR_PROPERTY);
-        }
-        String filename = newickDir+"/"+objIdentifier;
-        
+        // query the Newick string with the same identifier
+        PathQueryExecutor executor = im.getPathQueryExecutor();
+        PathQuery query = new PathQuery(im.getModel());
+        query.addViews("Newick.contents");                     // 0
+        query.addConstraint(Constraints.eq("Newick.identifier", objIdentifier));
+        ExportResultsIterator results;
         try {
-            String newick = "";
-            BufferedReader reader = new BufferedReader(new FileReader(filename));
-            String line = null;
-            while((line=reader.readLine())!=null) {
-                newick += line;
+            results = executor.execute(query);
+            String contents = null;
+            if (results.hasNext()) {
+                List<ResultElement> row = results.next();
+                contents = (String) row.get(0).getField();     // Newick.contents
+                // add to the request
+                request.setAttribute("newick", contents);
             }
-            request.setAttribute("newick", newick);
-        } catch (Exception ex) {
-            System.err.println(ex);
-            System.exit(1);
+        } catch (ObjectStoreException ex) {
+            throw new RuntimeException("Error retrieving data.", ex);
         }
     }
 }
