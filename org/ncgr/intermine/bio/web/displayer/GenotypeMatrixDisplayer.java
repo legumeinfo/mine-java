@@ -27,7 +27,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 /**
- * Pass attributes and phenotypes on to genotypeMatrixDisplayer. This is really just a stub; the marker data is acquired via Ajax calls to genotypeMatrixJSON.jsp.
+ * Pass attributes and samples on to genotypeMatrixDisplayer. This is really just a stub; the marker data is acquired via Ajax calls to genotypeMatrixJSON.jsp.
  *
  * @author Sam Hokin
  */
@@ -46,14 +46,15 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Query the available phenotypes and pass them on.
+     * Query the available samples and pass them on.
+     * ReportObject = GenotypingStudy
      */
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
 
-        Map<String,Object> attributes = reportObject.getAttributes();
-        String genotypingStudy = (String) attributes.get("primaryIdentifier"); 
-        String matrixNotes = (String) attributes.get("matrixNotes");
+        // GenotypingStudy attributes
+        String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
+        String studyDescription = (String) reportObject.getAttributes().get("description");
 
         // initialize
         HttpSession session = request.getSession();
@@ -61,26 +62,26 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
         PathQueryExecutor executor = im.getPathQueryExecutor(user);
         Model model = im.getModel();
 
-        // query phenotype names for genotypingStudy
-        PathQuery phenotypeQuery = new PathQuery(model);
-        phenotypeQuery.addView("GenotypingStudy.lines.phenotypeValues.phenotype.primaryIdentifier");
-        phenotypeQuery.addOrderBy("GenotypingStudy.lines.phenotypeValues.phenotype.primaryIdentifier", OrderDirection.ASC);
-        phenotypeQuery.addConstraint(Constraints.eq("GenotypingStudy.primaryIdentifier", genotypingStudy));
-        List<String> phenotypes = new LinkedList<>();
+        // query sample identifiers
+        PathQuery sampleQuery = new PathQuery(model);
+        sampleQuery.addView("GenotypingSample.primaryIdentifier");
+        sampleQuery.addOrderBy("GenotypingSample.primaryIdentifier", OrderDirection.ASC);
+        sampleQuery.addConstraint(Constraints.eq("GenotypingSample.study.primaryIdentifier", studyPrimaryIdentifier));
+        List<String> samples = new LinkedList<>();
         try {
-            ExportResultsIterator iterator = executor.execute(phenotypeQuery);
+            ExportResultsIterator iterator = executor.execute(sampleQuery);
             while (iterator.hasNext()) {
                 List<ResultElement> results = iterator.next();
-                String phenotype = (String) results.get(0).getField();
-                phenotypes.add(phenotype);
+                String sample = (String) results.get(0).getField();
+                samples.add(sample);
             }
         } catch (ObjectStoreException e) {
             // do nothing
         }
 
         // return attributes
-        request.setAttribute("genotypingStudy", genotypingStudy);
-        request.setAttribute("matrixNotes", matrixNotes);
-        request.setAttribute("phenotypes", phenotypes);
+        request.setAttribute("studyPrimaryIdentifier", studyPrimaryIdentifier);
+        request.setAttribute("studyDescription", studyDescription);
+        request.setAttribute("samples", samples);
     }
 }
