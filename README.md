@@ -1,2 +1,2 @@
-# intermine-webapps-src
-Common repo for webapps/src code shared amongst all LegFed mines
+# mine-webapp-java
+Common repo for webapp/src/main/java code used by all beany mines.
