@@ -51,7 +51,6 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
      */
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
-
         // GenotypingStudy attributes
         String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
         String studyDescription = (String) reportObject.getAttributes().get("description");
@@ -78,7 +77,6 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
         } catch (ObjectStoreException e) {
             // do nothing
         }
-
         // return attributes
         request.setAttribute("studyPrimaryIdentifier", studyPrimaryIdentifier);
         request.setAttribute("studyDescription", studyDescription);
