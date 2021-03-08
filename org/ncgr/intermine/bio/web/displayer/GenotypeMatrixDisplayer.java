@@ -27,7 +27,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 /**
- * Pass attributes and samples on to genotypeMatrixDisplayer. This is really just a stub; the marker data is acquired via Ajax calls to genotypeMatrixJSON.jsp.
+ * Just a stub. The real work is done in genotypeMatrixJSON.jsp.
  *
  * @author Sam Hokin
  */
@@ -51,35 +51,7 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
      */
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
-        // GenotypingStudy attributes
         String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
-        String studyDescription = (String) reportObject.getAttributes().get("description");
-
-        // initialize
-        HttpSession session = request.getSession();
-        Profile user = SessionMethods.getProfile(session);
-        PathQueryExecutor executor = im.getPathQueryExecutor(user);
-        Model model = im.getModel();
-
-        // query sample identifiers
-        PathQuery sampleQuery = new PathQuery(model);
-        sampleQuery.addView("GenotypingSample.primaryIdentifier");
-        sampleQuery.addOrderBy("GenotypingSample.primaryIdentifier", OrderDirection.ASC);
-        sampleQuery.addConstraint(Constraints.eq("GenotypingSample.study.primaryIdentifier", studyPrimaryIdentifier));
-        List<String> samples = new LinkedList<>();
-        try {
-            ExportResultsIterator iterator = executor.execute(sampleQuery);
-            while (iterator.hasNext()) {
-                List<ResultElement> results = iterator.next();
-                String sample = (String) results.get(0).getField();
-                samples.add(sample);
-            }
-        } catch (ObjectStoreException e) {
-            // do nothing
-        }
-        // return attributes
         request.setAttribute("studyPrimaryIdentifier", studyPrimaryIdentifier);
-        request.setAttribute("studyDescription", studyDescription);
-        request.setAttribute("samples", samples);
     }
 }
