@@ -2,7 +2,6 @@ package org.ncgr.intermine.bio.web.displayer;
 
 import java.util.List;
 import java.util.LinkedList;
-import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -27,7 +26,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 /**
- * Just a stub. The real work is done in genotypeMatrixJSON.jsp.
+ * Provides a minimal amount of starting data for the Javascript displayer.
  *
  * @author Sam Hokin
  */
@@ -46,12 +45,33 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Query the available samples and pass them on.
+     * Query the available chromosomes for the given GenotypingStudy and pass them on.
      * ReportObject = GenotypingStudy
      */
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
         String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
+
+        // query the chromsome identifiers
+        List<String> chrSecondaryIdentifiers = new LinkedList<>();
+        PathQueryExecutor executor = im.getPathQueryExecutor();
+        PathQuery query = new PathQuery(im.getModel());
+        query.addViews("VCFRecord.chromosome.secondaryIdentifier"); // 0
+        query.addConstraint(Constraints.eq("VCFRecord.genotypingStudy.primaryIdentifier", studyPrimaryIdentifier));
+        query.addOrderBy("VCFRecord.chromosome.secondaryIdentifier", OrderDirection.ASC);
+        try {
+            ExportResultsIterator iterator = executor.execute(query);
+            while (iterator.hasNext()) {
+                List<ResultElement> results = iterator.next();
+                chrSecondaryIdentifiers.add((String) results.get(0).getField());
+            }
+        } catch (ObjectStoreException ex) {
+            System.err.println(ex);
+            return;
+        }
+            
+        // output
         request.setAttribute("studyPrimaryIdentifier", studyPrimaryIdentifier);
+        request.setAttribute("chrSecondaryIdentifiers", chrSecondaryIdentifiers);
     }
 }
