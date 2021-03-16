@@ -15,6 +15,7 @@ import org.intermine.metadata.Model;
 import org.intermine.objectstore.ObjectStoreException;
 import org.intermine.pathquery.Constraints;
 import org.intermine.pathquery.OrderDirection;
+import org.intermine.pathquery.OuterJoinStatus;
 import org.intermine.pathquery.PathQuery;
 import org.intermine.web.displayer.ReportDisplayer;
 import org.intermine.web.logic.config.ReportDisplayerConfig;
@@ -53,17 +54,19 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
         String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
 
         // query the chromsome identifiers
+        // ASSUME MARKER
         List<String> chrSecondaryIdentifiers = new LinkedList<>();
         PathQueryExecutor executor = im.getPathQueryExecutor();
         PathQuery query = new PathQuery(im.getModel());
-        query.addViews("VCFRecord.chromosome.secondaryIdentifier"); // 0
-        query.addConstraint(Constraints.eq("VCFRecord.genotypingStudy.primaryIdentifier", studyPrimaryIdentifier));
-        query.addOrderBy("VCFRecord.chromosome.secondaryIdentifier", OrderDirection.ASC);
+        query.addViews("GenotypingRecord.marker.chromosome.secondaryIdentifier"); // 0
+        query.addConstraint(Constraints.eq("GenotypingRecord.study.primaryIdentifier", studyPrimaryIdentifier));
+        query.addOrderBy("GenotypingRecord.marker.chromosome.secondaryIdentifier", OrderDirection.ASC);
         try {
             ExportResultsIterator iterator = executor.execute(query);
             while (iterator.hasNext()) {
                 List<ResultElement> results = iterator.next();
-                chrSecondaryIdentifiers.add((String) results.get(0).getField());
+                String chr = (String) results.get(0).getField();
+                chrSecondaryIdentifiers.add(chr);
             }
         } catch (ObjectStoreException ex) {
             System.err.println(ex);
