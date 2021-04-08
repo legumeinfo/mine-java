@@ -222,7 +222,7 @@ public class LinkageGroupDisplayer extends ReportDisplayer {
         if (objectName.equals("GeneticMap")) {
             query.addConstraint(Constraints.eq("LinkageGroup.geneticMap.id", String.valueOf(reportId)));
         } else if (objectName.equals("QTL")) {
-            query.addConstraint(Constraints.eq("LinkageGroup.QTLs.id", String.valueOf(reportId)));
+            query.addConstraint(Constraints.eq("LinkageGroup.qtls.id", String.valueOf(reportId)));
         } else if (objectName.equals("LinkageGroup")) {
             query.addConstraint(Constraints.eq("LinkageGroup.id", String.valueOf(reportId)));
         }

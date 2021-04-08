@@ -1,7 +1,7 @@
 package org.ncgr.intermine.bio.web.displayer;
 
 import java.util.Map;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -25,6 +25,7 @@ import org.intermine.web.displayer.ReportDisplayer;
 import org.intermine.web.logic.config.ReportDisplayerConfig;
 import org.intermine.web.logic.results.ReportObject;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -46,7 +47,6 @@ public class GWASDisplayer extends ReportDisplayer {
 
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
-
         InterMineObject gwas = reportObject.getObject();
         String gwasIdentifier;
         try {
@@ -54,31 +54,75 @@ public class GWASDisplayer extends ReportDisplayer {
         } catch (IllegalAccessException ex) {
             throw new RuntimeException("Error getting GWAS.primaryIdentifier.", ex);
         }
-
         PathQueryExecutor executor = im.getPathQueryExecutor();
 
-        // store the GWASResults in maps
-	Map<String,Double> resultPValueMap = new LinkedHashMap<>();
-	Map<String,String> resultPhenotypeMap = new LinkedHashMap<>();
-	Map<String,String> resultMarkerMap = new LinkedHashMap<>();
-        Map<String,String> markerChromosomeMap = new LinkedHashMap<>();
-        Map<String,Integer> markerStartMap = new LinkedHashMap<>();
-        Map<String,Integer> markerEndMap = new LinkedHashMap<>();
-        Map<String,Integer> chromosomeLengthMap = new LinkedHashMap<>();
+        // get yuck = gensp.strain.assembly for this GWASResult's chromosomes
+        PathQuery yuckQuery = new PathQuery(im.getModel());
+        yuckQuery.addViews(
+                           "GWASResult.marker.organism.abbreviation", // 0
+                           "GWASResult.marker.strain.identifier",     // 1
+                           "GWASResult.marker.assemblyVersion"        // 2
+                           );
+        yuckQuery.addConstraint(Constraints.eq("GWASResult.gwas.primaryIdentifier", gwasIdentifier));
+        ExportResultsIterator yuckResults;
+        try {
+            yuckResults = executor.execute(yuckQuery);
+        } catch (ObjectStoreException ex) {
+            throw new RuntimeException("Error retrieving data.", ex);
+        }
+        String gensp = null;
+        String strainId = null;
+        String assemblyVersion = null;
+        if (yuckResults.hasNext()) {
+            List<ResultElement> row = yuckResults.next();
+            gensp = (String) row.get(0).getField();
+            strainId = (String) row.get(1).getField();
+            assemblyVersion = (String) row.get(2).getField();
+        }
+        String yuck = gensp+"."+strainId+"."+assemblyVersion;
+        
+        // query all chromosomes for this yuck
+        PathQuery chrQuery = new PathQuery(im.getModel());
+        chrQuery.addViews(
+                          "Chromosome.secondaryIdentifier", // 0
+                          "Chromosome.length"               // 1
+                          );
+        chrQuery.addOrderBy("Chromosome.secondaryIdentifier", OrderDirection.ASC);
+        chrQuery.addConstraint(Constraints.contains("Chromosome.primaryIdentifier", yuck));
+        ExportResultsIterator chrResults;
+        try {
+            chrResults = executor.execute(chrQuery);
+        } catch (ObjectStoreException ex) {
+            throw new RuntimeException("Error retrieving data.", ex);
+        }
+        List<Object> chromosomeLengths = new ArrayList<>();
+        while (chrResults.hasNext()) {
+            List<ResultElement> row = chrResults.next();
+            String chrId = (String) row.get(0).getField();
+            int chrLength = (Integer) row.get(1).getField();
+            chromosomeLengths.add(chrLength);
+        }
+        
+        // GWASResult query
+        // NOTE: trait.primaryIdentifier is not unique! trait|marker is unique.
 	PathQuery query = new PathQuery(im.getModel());
         query.addViews(
-		       "GWASResult.identifier",                            // 0
+                       "GWASResult.trait.primaryIdentifier",               // 0
                        "GWASResult.pValue",                                // 1
-                       "GWASResult.phenotype.primaryIdentifier",           // 2
-                       "GWASResult.marker.primaryIdentifier",            // 3
-                       "GWASResult.marker.chromosome.secondaryIdentifier", // 4
-                       "GWASResult.marker.chromosome.length",              // 5
-                       "GWASResult.marker.chromosomeLocation.start",       // 6
-                       "GWASResult.marker.chromosomeLocation.end"          // 7
+                       "GWASResult.marker.secondaryIdentifier",            // 2
+                       "GWASResult.marker.chromosome.secondaryIdentifier", // 3
+                       "GWASResult.marker.chromosomeLocation.start",       // 4
+                       "GWASResult.marker.chromosomeLocation.end"          // 5
                        );
         query.addConstraint(Constraints.eq("GWASResult.gwas.primaryIdentifier", gwasIdentifier));
         query.addOrderBy("GWASResult.marker.chromosome.secondaryIdentifier", OrderDirection.ASC);
-        query.addOrderBy("GWASResult.marker.primaryIdentifier", OrderDirection.ASC);
+        // storage, result maps are keyed by trait.primaryIdentifier (which should be unique)
+        Map<String,String> traitIdentifiers = new HashMap<>();
+        Map<String,Double> resultPValues = new HashMap<>();
+	Map<String,String> resultMarkers = new HashMap<>();
+        Map<String,String> markerChromosomes = new HashMap<>();
+        Map<String,Integer> markerPositions = new HashMap<>();
+        // execute the query
         ExportResultsIterator results;
         try {
             results = executor.execute(query);
@@ -87,44 +131,28 @@ public class GWASDisplayer extends ReportDisplayer {
         }
         while (results.hasNext()) {
             List<ResultElement> row = results.next();
-	    String resultIdentifier = (String) row.get(0).getField();       // GWASResult.identifier
+            String traitIdentifier = (String) row.get(0).getField();        // GWASResult.trait.primaryIdentifier
             Double pValue = (Double) row.get(1).getField();                 // GWASResult.pValue
-            String phenotypeIdentifier = (String) row.get(2).getField();    // GWASResult.phenotype.primaryIdentifier
-            String markerIdentifier = (String) row.get(3).getField();       // GWASResult.marker.primaryIdentifier
-            String chromosomeIdentifier = (String) row.get(4).getField();   // GWASResult.marker.chromosome.secondaryIdentifier
-            Integer chromosomeLength = (Integer) row.get(5).getField();     // GWASResult.marker.chromosome.length
-            Integer markerStart = (Integer) row.get(6).getField();          // GWASResult.marker.chromosomeLocation.start
-            Integer markerEnd = (Integer) row.get(7).getField();            // GWASResult.marker.chromosomeLocation.end
-	    resultPValueMap.put(resultIdentifier, pValue);
-	    resultPhenotypeMap.put(resultIdentifier, phenotypeIdentifier);
-	    resultMarkerMap.put(resultIdentifier, markerIdentifier);
-	    markerChromosomeMap.put(markerIdentifier, chromosomeIdentifier);
-	    markerStartMap.put(markerIdentifier, markerStart);
-	    markerEndMap.put(markerIdentifier, markerEnd);
-	    chromosomeLengthMap.put(chromosomeIdentifier, chromosomeLength);
+            String markerIdentifier = (String) row.get(2).getField();       // GWASResult.marker.secondaryIdentifier
+            String chromosomeIdentifier = (String) row.get(3).getField();   // GWASResult.marker.chromosome.secondaryIdentifier
+            int markerStart = (Integer) row.get(4).getField();          // GWASResult.marker.chromosomeLocation.start
+            int markerEnd = (Integer) row.get(5).getField();            // GWASResult.marker.chromosomeLocation.end
+            int markerPosition = (int)((double)(markerStart+markerEnd)/2);
+            String key = traitIdentifier+"|"+markerIdentifier;
+            traitIdentifiers.put(key, traitIdentifier);
+	    resultPValues.put(key, pValue);
+	    resultMarkers.put(key, markerIdentifier);
+	    markerChromosomes.put(key, chromosomeIdentifier);
+	    markerPositions.put(key, markerPosition);
         }
 
-        // form the maps for the y attribute JSON
-        Map<String,Object> smpsMap = new LinkedHashMap<>();
-        List<String> smps = new ArrayList<>();
-	smps.add("markerPosition");
-	smps.add("log10pValue");
-        smpsMap.put("smps", smps);
-
-        Map<String,Object> varsMap = new LinkedHashMap<>();
-        List<String> vars = new ArrayList<>();
-        for (String resultIdentifier : resultPValueMap.keySet()) {
-            vars.add(resultMarkerMap.get(resultIdentifier));
-        }
-	varsMap.put("vars", vars);
-
-        Map<String,Object> dataMap = new LinkedHashMap<>();
+        List<Object> vars = new ArrayList<>();
         List<Object> data = new ArrayList<>();
-        for (String resultIdentifier : resultPValueMap.keySet()) {
-	    double pValue = resultPValueMap.get(resultIdentifier);
-	    String markerIdentifier = resultMarkerMap.get(resultIdentifier);
-            String chromosomeIdentifier = markerChromosomeMap.get(markerIdentifier);
-            int chromosomeLength = chromosomeLengthMap.get(chromosomeIdentifier);
+        for (String key : resultPValues.keySet()) {
+	    double pValue = resultPValues.get(key);
+	    String markerIdentifier = resultMarkers.get(key);
+            int markerPosition = markerPositions.get(key);
+            String chromosomeIdentifier = markerChromosomes.get(key);
             // get the chromosome number from the identifier Chr01 or Chr1
             int len = chromosomeIdentifier.length();
             int chromosomeNumber = 0;
@@ -135,43 +163,33 @@ public class GWASDisplayer extends ReportDisplayer {
                 // one digit?
                 chromosomeNumber = Integer.parseInt(chromosomeIdentifier.substring(len-1,len));
             }
-            int markerStart = markerStartMap.get(markerIdentifier);
-            double frac = (double) markerStart / (double) chromosomeLength;
-            double markerPosition = (double) (chromosomeNumber-1) + frac;
-            double log10pValue = -Math.log10(pValue);
-            double[] values = { markerPosition, log10pValue };
-            data.add(values);
+            // vars
+            vars.add(markerIdentifier);
+            // data
+            List<Object> dataRecord = new ArrayList<>();
+            dataRecord.add(chromosomeNumber);
+            dataRecord.add(markerPosition);
+            dataRecord.add(-Math.log10(pValue));
+            data.add(dataRecord);
         }
-        dataMap.put("data", data);
 
-	// form the JSON for the y attribute
-        Map<String,Object> yMap = new LinkedHashMap<>();
-        yMap.put("smps", smps);
-        yMap.put("vars", vars);
-        yMap.put("data", data);
-        JSONObject y = new JSONObject(yMap);
-
-        // form the decoration markers JSON
-        Map<String,Object> markerMap = new LinkedHashMap<>();
-	List<String> samples = new ArrayList<>();
-	samples.add("markerPosition");
-	samples.add("log10pValue");
-        List<Map<String,Object>> markerList = new ArrayList<>();
-        for (String resultIdentifier : resultPValueMap.keySet()) {
-            Map<String,Object> resultMap = new LinkedHashMap<>();
-            resultMap.put("variable", resultMarkerMap.get(resultIdentifier));
-            resultMap.put("text", resultIdentifier);
-            resultMap.put("type", "text");
-            resultMap.put("sample", samples);
-            markerList.add(resultMap);
+        // for decorations
+        List<Object> traits = new ArrayList<>();
+        for (String key : traitIdentifiers.keySet()) {
+            traits.add(traitIdentifiers.get(key));
         }
-	boolean hasMarkers = markerList.size()>0;
-        markerMap.put("marker", markerList);
-        JSONObject markers = new JSONObject(markerMap);
+
+        // JSONArrays
+        JSONArray chrsJSON = new JSONArray(chromosomeLengths);
+        JSONArray varsJSON = new JSONArray(vars);
+        JSONArray dataJSON = new JSONArray(data);
+        JSONArray traitsJSON = new JSONArray(traits);
 
         // send the data on its way
-	request.setAttribute("hasMarkers", String.valueOf(hasMarkers));
-        request.setAttribute("y", y.toString());
-        request.setAttribute("markers", markers.toString());
+        request.setAttribute("chromosomeLengths", chrsJSON.toString());
+        request.setAttribute("vars", varsJSON.toString());
+        request.setAttribute("data", dataJSON.toString());
+        request.setAttribute("traits", traitsJSON.toString());
+        request.setAttribute("yuck", yuck);
     }
 }
