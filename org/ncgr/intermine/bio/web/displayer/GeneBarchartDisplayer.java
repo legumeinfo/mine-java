@@ -69,6 +69,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         try {
             sourcesResult = executor.execute(sourcesQuery);
         } catch (ObjectStoreException e) {
+            System.err.println(e);
             // likely we don't have expression for this particular gene, so return empty values
             request.setAttribute("sources", "");
             request.setAttribute("sourcesJSON", "");
@@ -82,7 +83,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 throw new RuntimeException("Null row or row element retrieving samples.");
             } else {
                 Integer id = (Integer)row.get(0).getField();       // 0 ExpressionValue.sample.source.id
-                String identifier = (String)row.get(1).getField(); // 1 ExpressionValue.sample.source.identifier
+                String identifier = (String)row.get(1).getField(); // 1 ExpressionValue.sample.source.primaryIdentifier
                 // load out stuff
                 Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
                 jsonMap.put("id", id);
@@ -195,7 +196,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve expression sources associated with the given gene, alphabetically by ExpressionSource.identifier.
+     * Create a path query to retrieve expression sources associated with the given gene, alphabetically by ExpressionSource.primaryIdentifier.
      *
      * @param model the model
      * @param geneID the gene for which sources are queried
@@ -204,9 +205,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     private PathQuery querySources(Model model, String geneID) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionValue.sample.source.id");                // 0
-        query.addView("ExpressionValue.sample.source.identifier");        // 1
+        query.addView("ExpressionValue.sample.source.primaryIdentifier"); // 1
         query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
-        query.addOrderBy("ExpressionValue.sample.source.identifier", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.source.primaryIdentifier", OrderDirection.ASC);
         return query;
     }
 
@@ -221,7 +222,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier"); // 0
         query.addView("ExpressionSample.description");       // 1
-        query.addConstraint(Constraints.eq("ExpressionSample.source.identifier", source));
+        query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
     }
@@ -245,7 +246,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         // Add orderby
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
-        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.identifier", source));
+        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
         return query;
     }
