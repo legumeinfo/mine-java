@@ -23,6 +23,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.apache.struts.action.ActionForm;
 import org.apache.struts.action.ActionForward;
@@ -86,14 +87,15 @@ public class HeatMapController extends TilesAction {
         }
 
         // store the source names in a list and the source data in a list of JSON
-        List<String> sources = new LinkedList<String>();
-        List<String> sourcesJSON = new LinkedList<String>();
+        List<String> sources = new LinkedList<>();
+        List<String> sourcesJSON = new LinkedList<>();
         
         // we'll store the JSON blocks in a string list, as well as a list of sample counts and description maps
-        List<String> expressionJSON = new LinkedList<String>();
-        List<String> descriptionsJSON = new LinkedList<String>();
-        List<Integer> geneCounts = new LinkedList<Integer>();
-        List<Integer> sampleCounts = new LinkedList<Integer>();
+        List<String> expressionJSON = new LinkedList<>();
+        List<String> descriptionsJSON = new LinkedList<>();
+        List<String> namesJSON = new LinkedList<>();
+        List<Integer> geneCounts = new LinkedList<>();
+        List<Integer> sampleCounts = new LinkedList<>();
         
         // query ALL the sources and load the ones with enough genes (more than two)
         PathQuery sourcesQuery = querySources(model, bag);
@@ -105,7 +107,7 @@ public class HeatMapController extends TilesAction {
             return null;
         }
         if (!sourcesResult.hasNext()) {
-            setErrorMessage(request, sourcesQuery.toString());
+            setErrorMessage(request, sourcesQuery);
             return null;
         }
         while (sourcesResult.hasNext()) {
@@ -118,8 +120,9 @@ public class HeatMapController extends TilesAction {
 	    String source = (String)sourceRow.get(1).getField();  // 1 ExpressionValue.sample.source.primaryIdentifier
 
             // query samples and sample descriptions
-            List<String> samples = new LinkedList<String>();
-            Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
+            List<String> samples = new LinkedList<>();
+            Map<String,String> sampleDescriptions = new LinkedHashMap<>();
+            Map<String,String> sampleNames = new LinkedHashMap<>();
             PathQuery samplesQuery = querySamples(model, source);
             ExportResultsIterator samplesResult;
             try {
@@ -131,12 +134,14 @@ public class HeatMapController extends TilesAction {
             while (samplesResult.hasNext()) {
                 List<ResultElement> sampleRow = samplesResult.next();
                 if (sampleRow==null || sampleRow.get(0)==null || sampleRow.get(0).getField()==null) {
-                    throw new RuntimeException("Null row or row element retrieving samples.");
+                    throw new RuntimeException("Null row or row element 0 retrieving samples.");
                 }
                 String sample = (String) sampleRow.get(0).getField();
                 String sampleDescription = (String) sampleRow.get(1).getField();
+                String sampleName = (String) sampleRow.get(2).getField();
                 samples.add(sample);
                 sampleDescriptions.put(sample, sampleDescription);
+                sampleNames.put(sample, sampleName);
             }
             
             // if no samples return an empty JSON string and bail - that's a bug!
@@ -146,7 +151,7 @@ public class HeatMapController extends TilesAction {
             }
             
             // query the expression values for this source and gene bag
-            Map<String, List<ExprValue>> expressionValueMap = new LinkedHashMap<String, List<ExprValue>>();
+            Map<String, List<ExprValue>> expressionValueMap = new LinkedHashMap<>();
             PathQuery valuesQuery = queryExpressionValues(model, source, bag);
             ExportResultsIterator valuesResult;
             try {
@@ -163,7 +168,7 @@ public class HeatMapController extends TilesAction {
                 ExprValue expValue = new ExprValue(sample, num, value, geneID);
                 if (!expressionValueMap.containsKey(geneID)) {
                     // create a new list with space for n (size of samples) ExpressionValues
-                    List<ExprValue> expressionValueList = new ArrayList<ExprValue>(Collections.nCopies(samples.size(), new ExprValue()));
+                    List<ExprValue> expressionValueList = new ArrayList<>(Collections.nCopies(samples.size(), new ExprValue()));
                     expressionValueList.set(samples.indexOf(sample), expValue);
                     expressionValueMap.put(geneID, expressionValueList);
                 } else {
@@ -179,14 +184,14 @@ public class HeatMapController extends TilesAction {
             }
             
             // canvasXpress "smps" = genes
-            List<String> genes =  new ArrayList<String>(expressionValueMap.keySet());
+            List<String> genes =  new ArrayList<>(expressionValueMap.keySet());
             
             // only continue if we've got more than two genes (because the heat map stalls with only two)
             if (genes.size()>2) {
                 
                 // add to the source lists
                 sources.add(source);
-                Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
+                Map<String,Object> jsonMap = new LinkedHashMap<>();
                 jsonMap.put("id", id);
                 jsonMap.put("primaryIdentifier", source);
                 jsonMap.put("unit", "TPM");
@@ -239,25 +244,28 @@ public class HeatMapController extends TilesAction {
                 }             
                     
                 // put the main heatmap data into a JSONObject for "y"
-                Map<String, Object> yInHeatmapData = new LinkedHashMap<String, Object>();
+                Map<String, Object> yInHeatmapData = new LinkedHashMap<>();
                 yInHeatmapData.put("vars", samples);
                 yInHeatmapData.put("smps", genes);
                 yInHeatmapData.put("data", data);
                     
                 // load analysis data into "x"
-                Map<String,Object> xInHeatmapData = new LinkedHashMap<String,Object>();
+                Map<String,Object> xInHeatmapData = new LinkedHashMap<>();
                 xInHeatmapData.put("PCorr", meanCorr);
                     
                 // create the map that gets converted to the JSON object
-                Map<String, Object> heatmapData = new LinkedHashMap<String, Object>();
+                Map<String, Object> heatmapData = new LinkedHashMap<>();
                 heatmapData.put("x", xInHeatmapData);
                 heatmapData.put("y", yInHeatmapData);
                     
                 // convert to JSONObject and add to expressionJSON
                 expressionJSON.add(new JSONObject(heatmapData).toString());
                     
-                // add the the sample descriptions to the list
+                // add the sample descriptions to the list
                 descriptionsJSON.add(new JSONObject(sampleDescriptions).toString());
+
+                // add the sample names to the list
+                namesJSON.add(new JSONObject(sampleNames).toString());
                     
                 // add these results to the results maps
                 geneCounts.add(genes.size());
@@ -273,6 +281,7 @@ public class HeatMapController extends TilesAction {
         request.setAttribute("sampleCounts", sampleCounts);
         request.setAttribute("expressionJSON", expressionJSON);
         request.setAttribute("descriptionsJSON", descriptionsJSON);
+        request.setAttribute("namesJSON", namesJSON);
         
         return null;
     }
@@ -319,6 +328,7 @@ public class HeatMapController extends TilesAction {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.primaryIdentifier");
         query.addView("ExpressionSample.description");
+        query.addView("ExpressionSample.name");
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
@@ -376,6 +386,16 @@ public class HeatMapController extends TilesAction {
     void setErrorMessage(HttpServletRequest request, String errorMessage) {
         setEmptyRequestAttributes(request);
         request.setAttribute("errorMessage", errorMessage);
+    }
+
+    /**
+     * Set an error message in the request as the XML version of a failed PathQuery.
+     *
+     * @param request the supplied HttpServletRequest object
+     * @param query the PathQuery that failed
+     */
+    void setErrorMessage(HttpServletRequest request, PathQuery query) {
+        setErrorMessage(request, StringEscapeUtils.escapeHtml4(query.toXml()));
     }
 
     /**
