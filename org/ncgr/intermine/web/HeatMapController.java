@@ -96,7 +96,7 @@ public class HeatMapController extends TilesAction {
         List<String> namesJSON = new LinkedList<>();
         List<Integer> geneCounts = new LinkedList<>();
         List<Integer> sampleCounts = new LinkedList<>();
-        
+
         // query ALL the sources and load the ones with enough genes (more than two)
         PathQuery sourcesQuery = querySources(model, bag);
         ExportResultsIterator sourcesResult;
@@ -119,6 +119,18 @@ public class HeatMapController extends TilesAction {
             Integer id = (Integer)sourceRow.get(0).getField();    // 0 ExpressionValue.sample.source.id
 	    String source = (String)sourceRow.get(1).getField();  // 1 ExpressionValue.sample.source.primaryIdentifier
 
+            // query the expression unit
+            PathQuery expressionUnitQuery = queryExpressionUnit(model, source);
+            ExportResultsIterator unitResult;
+            try {
+                unitResult = executor.execute(expressionUnitQuery, 0, 1);
+            } catch (ObjectStoreException e) {
+                setErrorMessage(request, "Error retrieving expression unit: "+e.toString());
+                return null;
+            }
+            List<ResultElement> unitRow = unitResult.next();
+            String unit = (String) unitRow.get(0).getField();
+
             // query samples and sample descriptions
             List<String> samples = new LinkedList<>();
             Map<String,String> sampleDescriptions = new LinkedHashMap<>();
@@ -128,7 +140,7 @@ public class HeatMapController extends TilesAction {
             try {
                 samplesResult = executor.execute(samplesQuery);
             } catch (ObjectStoreException e) {
-                setErrorMessage(request, "Error retrieving samples"+e.toString());
+                setErrorMessage(request, "Error retrieving samples: "+e.toString());
                 return null;
             }
             while (samplesResult.hasNext()) {
@@ -194,7 +206,7 @@ public class HeatMapController extends TilesAction {
                 Map<String,Object> jsonMap = new LinkedHashMap<>();
                 jsonMap.put("id", id);
                 jsonMap.put("primaryIdentifier", source);
-                jsonMap.put("unit", "TPM");
+                jsonMap.put("unit", unit);
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
                 // canvasXpress "data" = double[samples][genes]
@@ -359,7 +371,25 @@ public class HeatMapController extends TilesAction {
         query.addConstraint(Constraints.in("ExpressionValue.feature", bag.getName()));
 	query.addConstraint(Constraints.isNotNull("ExpressionValue.value"));
         List<String> verifyList = query.verifyQuery();
-        if (!verifyList.isEmpty()) throw new RuntimeException("Expression query invalid: "+verifyList);
+        if (!verifyList.isEmpty()) throw new RuntimeException("Expression values query invalid: "+verifyList);
+        return query;
+    }
+
+    /**
+     * Create a path query to retrieve the expression unit from ExpressionValue.
+     *
+     * @param model  the model
+     * @param source the identifier of the ExpressionSource
+     * @return the path query
+     */
+    PathQuery queryExpressionUnit(Model model, String source) {
+        PathQuery query = new PathQuery(model);
+        // Add views
+        query.addView("ExpressionValue.unit"); // 0
+        // Add source and bag constraints
+        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
+        List<String> verifyList = query.verifyQuery();
+        if (!verifyList.isEmpty()) throw new RuntimeException("Expression unit query invalid: "+verifyList);
         return query;
     }
 

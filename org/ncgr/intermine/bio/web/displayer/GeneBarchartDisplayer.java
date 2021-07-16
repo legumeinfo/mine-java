@@ -47,7 +47,6 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
 
     @Override
     public void display(HttpServletRequest request, ReportObject reportObject) {
-
         // get the model and path query executor
         Model model = im.getModel();
         PathQueryExecutor executor = im.getPathQueryExecutor();
@@ -93,14 +92,29 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             }
         }
 
-        // now loop over the sources to get samples and expression
         // we'll store the JSON blocks in a string list
         List<String> jsonList = new LinkedList<String>();
         // and the sample descriptions in another list
         List<String> descriptionsList = new LinkedList<String>();
-
+        // and the expression unit in another list
+        List<String> unitsList = new LinkedList<String>();
+        // now loop over the sources to get unit, samples, and expression
         for (String source : sources) {
-
+            // query the expression unit for this source
+            PathQuery unitQuery = queryExpressionUnit(model, source);
+            ExportResultsIterator unitResult;
+            try {
+                unitResult = executor.execute(unitQuery);
+            } catch (ObjectStoreException e) {
+                throw new RuntimeException("Error retrieving expression unit: ", e);
+            }
+            List<ResultElement> unitRow = unitResult.next();
+            if (unitRow==null || unitRow.get(0)==null || unitRow.get(0).getField()==null) {
+                throw new RuntimeException("Null row or row element retrieving expression unit.");
+            } else {
+                String unit = (String) unitRow.get(0).getField();
+                unitsList.add(unit);
+            }
             // query the samples for this source, put them in a list
             List<String> samples = new LinkedList<String>();
             Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
@@ -109,7 +123,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             try {
                 samplesResult = executor.execute(samplesQuery);
             } catch (ObjectStoreException e) {
-                throw new RuntimeException("Error retrieving samples.", e);
+                throw new RuntimeException("Error retrieving samples: ", e);
             }
             while (samplesResult.hasNext()) {
                 List<ResultElement> row = samplesResult.next();
@@ -122,13 +136,11 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                     sampleDescriptions.put(sample, description);
                 }
             }
-
             // if no samples return an empty JSON string and bail
             if (samples.size()==0) {
                 request.setAttribute("expressionValueJSON", "{}");
                 return;
             }
-
             // query the expression values for this source and gene, put them in a list
             PathQuery valuesQuery = queryExpressionValuesForGene(model, source, geneID);
             List<ExprValue> exprValues = new LinkedList<ExprValue>();
@@ -146,17 +158,14 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 ExprValue eval = new ExprValue(sample, num, value, geneID);
                 exprValues.add(eval);
             }
-
             // if no expression values for this gene return an empty JSON string and bail
             if (exprValues.size()==0) {
                 request.setAttribute("expressionValueJSON", "{}");
                 return;
             }
-            
             // canvasXpress "vars" = gene (just one)
             List<String> vars = new LinkedList<String>();
             vars.add(geneID);
-            
             // canvasXpress "data"
             double[][] data = new double[1][samples.size()];
             for (int j=0; j<samples.size(); j++) {
@@ -166,33 +175,27 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                     data[0][j] = 0.0;
                 }
             }
-            
             // put the canvasXpress data into the JSONObject
             Map<String, Object> yInBarchartData =  new LinkedHashMap<String, Object>();
+            Map<String, Object> barchartData = new LinkedHashMap<String, Object>();
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
             yInBarchartData.put("data", data);
-            
-            Map<String, Object> barchartData = new LinkedHashMap<String, Object>();
             barchartData.put("y", yInBarchartData);
-            
             // the JSON data
             JSONObject jo = new JSONObject(barchartData);
-
             // add this JSON to the list of JSONs
             jsonList.add(jo.toString());
-
             // add the the sample descriptions to the list
             JSONObject descriptionsJSON = new JSONObject(sampleDescriptions);
             descriptionsList.add(descriptionsJSON.toString());
-
         }
-
         // set the return attributes
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
         request.setAttribute("descriptionsList", descriptionsList);
+        request.setAttribute("unitsList", unitsList);
     }
 
     /**
@@ -224,6 +227,24 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         query.addView("ExpressionSample.description");       // 1
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
+        return query;
+    }
+
+    /**
+     * Create a path query to retrieve the expression unit from ExpressionValue.
+     *
+     * @param model  the model
+     * @param source the identifier of the ExpressionSource
+     * @return the path query
+     */
+    PathQuery queryExpressionUnit(Model model, String source) {
+        PathQuery query = new PathQuery(model);
+        // Add views
+        query.addView("ExpressionValue.unit"); // 0
+        // Add source and bag constraints
+        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
+        List<String> verifyList = query.verifyQuery();
+        if (!verifyList.isEmpty()) throw new RuntimeException("Expression unit query invalid: "+verifyList);
         return query;
     }
 
