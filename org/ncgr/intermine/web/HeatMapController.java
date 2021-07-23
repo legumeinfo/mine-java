@@ -198,91 +198,87 @@ public class HeatMapController extends TilesAction {
             // canvasXpress "smps" = genes
             List<String> genes =  new ArrayList<>(expressionValueMap.keySet());
             
-            // only continue if we've got more than two genes (because the heat map stalls with only two)
-            if (genes.size()>2) {
+            // add to the source lists
+            sources.add(source);
+            Map<String,Object> jsonMap = new LinkedHashMap<>();
+            jsonMap.put("id", id);
+            jsonMap.put("primaryIdentifier", source);
+            jsonMap.put("unit", unit);
+            sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
-                // add to the source lists
-                sources.add(source);
-                Map<String,Object> jsonMap = new LinkedHashMap<>();
-                jsonMap.put("id", id);
-                jsonMap.put("primaryIdentifier", source);
-                jsonMap.put("unit", unit);
-                sourcesJSON.add(new JSONObject(jsonMap).toString());
+            // canvasXpress "data" = double[samples][genes]
+            double[][] data = new double[samples.size()][genes.size()];
+            for (int j=0; j<genes.size(); j++) {
+                String gene = genes.get(j);
+                for (int i=0; i<samples.size(); i++) {
+                    if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null) {
+                        data[i][j] = (double) expressionValueMap.get(gene).get(i).value;
+                    } else {
+                        data[i][j] = 0.0;
+                    }
+                }
+            }
                 
-                // canvasXpress "data" = double[samples][genes]
-                double[][] data = new double[samples.size()][genes.size()];
-                for (int j=0; j<genes.size(); j++) {
-                    String gene = genes.get(j);
-                    for (int i=0; i<samples.size(); i++) {
-                        if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null) {
-                            data[i][j] = (double) expressionValueMap.get(gene).get(i).value;
-                        } else {
-                            data[i][j] = 0.0;
+            // analysis: calculate the mean Pearson's correlation coefficient of each gene with each other gene
+            PearsonsCorrelation pCorr = new PearsonsCorrelation();
+            Mean mean = new Mean();
+            double[] meanCorr = new double[genes.size()];
+            for (int j=0; j<genes.size(); j++) {
+                String gene1 = genes.get(j);
+                double[] values1 = new double[samples.size()];
+                for (int i=0; i<samples.size(); i++) {
+                    if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null) {
+                        values1[i] = (double) expressionValueMap.get(gene1).get(i).value;
+                    }
+                }
+                double totalCorr = 0.0;
+                int count = 0;
+                for (int k=0; k<genes.size(); k++) {
+                    if (j!=k) {
+                        String gene2 = genes.get(k);
+                        double[] values2 = new double[samples.size()];
+                        for (int i=0; i<samples.size(); i++) {
+                            if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null) {
+                                values2[i] = (double) expressionValueMap.get(gene2).get(i).value;
+                            }
+                        }
+                        double corr = pCorr.correlation(values1, values2);
+                        if (!Double.isNaN(corr)) {
+                            count++;
+                            totalCorr += corr;
                         }
                     }
                 }
-                
-                // analysis: calculate the mean Pearson's correlation coefficient of each gene with each other gene
-                PearsonsCorrelation pCorr = new PearsonsCorrelation();
-                Mean mean = new Mean();
-                double[] meanCorr = new double[genes.size()];
-                for (int j=0; j<genes.size(); j++) {
-                    String gene1 = genes.get(j);
-                    double[] values1 = new double[samples.size()];
-                    for (int i=0; i<samples.size(); i++) {
-                        if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null) {
-                            values1[i] = (double) expressionValueMap.get(gene1).get(i).value;
-                        }
-                    }
-                    double totalCorr = 0.0;
-                    int count = 0;
-                    for (int k=0; k<genes.size(); k++) {
-                        if (j!=k) {
-                            String gene2 = genes.get(k);
-                            double[] values2 = new double[samples.size()];
-                            for (int i=0; i<samples.size(); i++) {
-                                if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null) {
-                                    values2[i] = (double) expressionValueMap.get(gene2).get(i).value;
-                                }
-                            }
-                            double corr = pCorr.correlation(values1, values2);
-                            if (!Double.isNaN(corr)) {
-                                count++;
-                                totalCorr += corr;
-                            }
-                        }
-                    }
-                    if (count>0) meanCorr[j] = totalCorr/count;
-                }             
+                if (count>0) meanCorr[j] = totalCorr/count;
+            }             
                     
-                // put the main heatmap data into a JSONObject for "y"
-                Map<String, Object> yInHeatmapData = new LinkedHashMap<>();
-                yInHeatmapData.put("vars", samples);
-                yInHeatmapData.put("smps", genes);
-                yInHeatmapData.put("data", data);
+            // put the main heatmap data into a JSONObject for "y"
+            Map<String, Object> yInHeatmapData = new LinkedHashMap<>();
+            yInHeatmapData.put("vars", samples);
+            yInHeatmapData.put("smps", genes);
+            yInHeatmapData.put("data", data);
                     
-                // load analysis data into "x"
-                Map<String,Object> xInHeatmapData = new LinkedHashMap<>();
-                xInHeatmapData.put("PCorr", meanCorr);
+            // load analysis data into "x"
+            Map<String,Object> xInHeatmapData = new LinkedHashMap<>();
+            xInHeatmapData.put("PCorr", meanCorr);
                     
-                // create the map that gets converted to the JSON object
-                Map<String, Object> heatmapData = new LinkedHashMap<>();
-                heatmapData.put("x", xInHeatmapData);
-                heatmapData.put("y", yInHeatmapData);
+            // create the map that gets converted to the JSON object
+            Map<String, Object> heatmapData = new LinkedHashMap<>();
+            heatmapData.put("x", xInHeatmapData);
+            heatmapData.put("y", yInHeatmapData);
                     
-                // convert to JSONObject and add to expressionJSON
-                expressionJSON.add(new JSONObject(heatmapData).toString());
+            // convert to JSONObject and add to expressionJSON
+            expressionJSON.add(new JSONObject(heatmapData).toString());
                     
-                // add the sample descriptions to the list
-                descriptionsJSON.add(new JSONObject(sampleDescriptions).toString());
+            // add the sample descriptions to the list
+            descriptionsJSON.add(new JSONObject(sampleDescriptions).toString());
 
-                // add the sample names to the list
-                namesJSON.add(new JSONObject(sampleNames).toString());
+            // add the sample names to the list
+            namesJSON.add(new JSONObject(sampleNames).toString());
                     
-                // add these results to the results maps
-                geneCounts.add(genes.size());
-                sampleCounts.add(samples.size());
-            }
+            // add these results to the results maps
+            geneCounts.add(genes.size());
+            sampleCounts.add(samples.size());
         }
         
         // set the return attributes
