@@ -187,7 +187,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.identifier.
+     * Create a path query to retrieve expression sources alphabetically by ExpressionSource.primaryIdentifier.
      *
      * @param model the model
      * @return the path query
@@ -195,10 +195,10 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
     private PathQuery querySources(Model model) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSource.id");          // 0
-        query.addView("ExpressionSource.identifier");  // 1  
+        query.addView("ExpressionSource.primaryIdentifier");  // 1  
         query.addView("ExpressionSource.description"); // 2
         query.addView("ExpressionSource.unit");        // 3
-        query.addOrderBy("ExpressionSource.identifier", OrderDirection.ASC);
+        query.addOrderBy("ExpressionSource.primaryIdentifier", OrderDirection.ASC);
         return query;
     }
 
@@ -237,7 +237,7 @@ public class GeneHeatmapDisplayer extends ReportDisplayer {
         query.addOrderBy("Gene.expressionValues.sample.num", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
         query.addConstraint(Constraints.isNotNull("Gene.expressionValues.value"));
-        query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.identifier", source));
+        query.addConstraint(Constraints.eq("Gene.expressionValues.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.eq("Gene.primaryIdentifier", geneID));
         return query;
     }

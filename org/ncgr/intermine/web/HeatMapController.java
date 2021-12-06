@@ -329,7 +329,7 @@ public class HeatMapController extends TilesAction {
      * Create a path query to retrieve the sample primaryIdentifiers and descriptions for a given source.
      *
      * @param model the model
-     * @param source the identifier of the expression source
+     * @param source the primaryIdentifier of the expression source
      * @return the path query
      */
     PathQuery querySamples(Model model, String source) {
@@ -348,7 +348,7 @@ public class HeatMapController extends TilesAction {
      * Create a path query to retrieve gene expression values from a bag of genes for the given expression source.
      *
      * @param model  the model
-     * @param source the identifier of the ExpressionSource
+     * @param source the primaryIdentifier of the ExpressionSource
      * @param bag    the bag o'genes
      * @return the path query
      */
@@ -375,7 +375,7 @@ public class HeatMapController extends TilesAction {
      * Create a path query to retrieve the expression unit from ExpressionValue.
      *
      * @param model  the model
-     * @param source the identifier of the ExpressionSource
+     * @param source the primaryIdentifier of the ExpressionSource
      * @return the path query
      */
     PathQuery queryExpressionUnit(Model model, String source) {

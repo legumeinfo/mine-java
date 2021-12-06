@@ -3,6 +3,7 @@ package org.ncgr.intermine.web.logic;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
@@ -19,9 +20,12 @@ import org.intermine.bio.web.biojava.BioSequenceFactory.SequenceType;
 import org.intermine.bio.web.export.ResidueFieldExporter;
 import org.intermine.model.InterMineObject;
 import org.intermine.model.bio.BioEntity;
+import org.intermine.model.bio.CDS;
+import org.intermine.model.bio.GeneFamily;
 import org.intermine.model.bio.Protein;
 import org.intermine.model.bio.Sequence;
 import org.intermine.model.bio.SequenceFeature;
+import org.intermine.model.bio.Transcript;
 import org.intermine.objectstore.ObjectStore;
 import org.intermine.objectstore.ObjectStoreException;
 import org.intermine.metadata.TypeUtil;
@@ -30,23 +34,26 @@ import org.intermine.web.logic.session.SessionMethods;
 import org.intermine.web.struts.InterMineAction;
 
 /**
- * Methods to provide a sequence.
+ * Methods to provide a sequence, sequence type, and gene family for an annotation webapp.
  *
  * @author Sam Hokin
  */
-public class SequenceBlastUtil {
+public class SequenceAnnotateUtil {
     private static final String PROPERTY_DESCRIPTIONLINE = "description_line";
     private BioSequence bioSequence;
     private String method;
     private String identifier;
-
+    private String objClass;
+    private String sequenceType;
+    private String geneFamilyIdentifier;
+    
     /**
      * Construct from an HttpServletRequest
      * 
      * @param request the HttpServletRequest
      * @param objectId the ID of the IntermineObject
      */
-    public SequenceBlastUtil(HttpServletRequest request, Integer objectId) throws ObjectStoreException, IllegalAccessException, CompoundNotFoundException {
+    public SequenceAnnotateUtil(HttpServletRequest request, Integer objectId) throws ObjectStoreException, IllegalAccessException, CompoundNotFoundException {
         HttpSession session = request.getSession();
         final InterMineAPI im = SessionMethods.getInterMineAPI(session);
         ObjectStore os = im.getObjectStore();
@@ -54,14 +61,33 @@ public class SequenceBlastUtil {
         Properties webProps = (Properties) session.getServletContext().getAttribute(Constants.WEB_PROPERTIES);
         InterMineObject obj = getObject(os, webProps, objectId);
 
-        bioSequence = createBioSequence(obj);
-        if (bioSequence!=null) {
-            if (obj instanceof SequenceFeature) {
-                method = "blastn";
-            } else if (obj instanceof Protein) {
-                method = "blastp";
+        // find the object class
+        List<String> objStrings = new LinkedList<>(obj.getoBJECT().getStrings());
+        objClass = objStrings.get(0).substring(27);
+
+        // limit to CDS, Transcript/MRNA, Protein
+        if (objClass.equals("CDS") || objClass.equals("Transcript") || objClass.equals("MRNA") || objClass.equals("Protein")) {
+            if (objClass.equals("Protein")) {
+                Protein protein = (Protein) obj;
+                geneFamilyIdentifier = protein.getGeneFamily().getIdentifier();
+            } else if (objClass.equals("Transcript") || objClass.equals("MRNA")) {
+                Transcript transcript = (Transcript) obj;
+                geneFamilyIdentifier = transcript.getGene().getGeneFamily().getIdentifier();
+            } else if (objClass.equals("CDS")) {
+                CDS cds = (CDS) obj;
+                geneFamilyIdentifier = cds.getGene().getGeneFamily().getIdentifier();
             }
-            bioSequence.setAccession(new AccessionID((String) obj.getFieldValue("primaryIdentifier")));
+            if (geneFamilyIdentifier!=null) {
+                bioSequence = createBioSequence(obj);
+                if (bioSequence!=null) {
+                    if (obj instanceof SequenceFeature) {
+                        sequenceType = "n";
+                    } else if (obj instanceof Protein) {
+                        sequenceType = "p";
+                    }
+                    bioSequence.setAccession(new AccessionID((String) obj.getFieldValue("primaryIdentifier")));
+                }
+            }
         }
     }
 
@@ -73,10 +99,10 @@ public class SequenceBlastUtil {
     }
 
     /**
-     * Return the appropriate BLAST method (which may be null)
+     * Return the appropriate sequence type (which may be null)
      */
-    public String getMethod() {
-        return method;
+    public String getSequenceType() {
+        return sequenceType;
     }
 
     /**
@@ -84,6 +110,13 @@ public class SequenceBlastUtil {
      */
     public String getIdentifier() {
         return identifier;
+    }
+
+    /**
+     * Return the gene family identifier for this object
+     */
+    public String getGeneFamilyIdentifier() {
+        return geneFamilyIdentifier;
     }
 
     /**
@@ -126,9 +159,9 @@ public class SequenceBlastUtil {
      *
      * @param os the ObjectStore
      * @param webProps the web.properties
-     * @param objectId the object ID
+     * @param objectId the object ID 
      * @return the InterMineObject
-     */
+    */
     private InterMineObject getObject(ObjectStore os, Properties webProps, Integer objectId) throws ObjectStoreException {
         String classNames = webProps.getProperty("fasta.export.classes");
         List<Class<?>> classList = new ArrayList<Class<?>>();
@@ -160,5 +193,14 @@ public class SequenceBlastUtil {
      */
     public String getFasta() {
         return ">"+getIdentifier()+"\n"+getBioSequence().toString();
+    }
+
+    /**
+     * Return the class of the InterMineObject (Gene, Transcript, MRNA, Protein, etc.)
+     *
+     * @return the object class
+     */
+    public String getObjClass() {
+        return objClass;
     }
 }
