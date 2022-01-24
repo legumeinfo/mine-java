@@ -52,10 +52,10 @@ public class GWASCircle extends ReportDisplayer {
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
 
-        // get the markers and phenotypes from the GWASResults
+        // get the markers and traits from the GWASResults
         List<String> markerList = new LinkedList<>();
         List<String> chromosomeList = new LinkedList<>();
-        List<String> phenotypeList = new LinkedList<>();
+        List<String> traitList = new LinkedList<>();
         List<Integer> positionList = new LinkedList<>();
         List<Double> log10pList = new LinkedList<>();
         // GWASResult.marker.primaryIdentifier,            // 0
@@ -63,7 +63,7 @@ public class GWASCircle extends ReportDisplayer {
         // GWASResult.marker.chromosome.length,            // 2
         // GWASResult.marker.chromosomeLocation.start,     // 3
         // GWASResult.marker.chromosomeLocation.end,       // 4
-        // GWASResult.phenotype.primaryIdentifier,         // 5
+        // GWASResult.trait.primaryIdentifier,         // 5
         // GWASResult.pValue                               // 6
         PathQuery query = new PathQuery(im.getModel());
         query.addViews(
@@ -72,7 +72,7 @@ public class GWASCircle extends ReportDisplayer {
                        "GWASResult.marker.chromosome.length",            // 2
                        "GWASResult.marker.chromosomeLocation.start",     // 3
                        "GWASResult.marker.chromosomeLocation.end",       // 4
-                       "GWASResult.phenotype.primaryIdentifier",         // 5
+                       "GWASResult.trait.primaryIdentifier",         // 5
                        "GWASResult.pValue"                               // 6
                        );
         query.addConstraint(Constraints.eq("GWASResult.study.primaryIdentifier", gwasIdentifier));
@@ -91,7 +91,7 @@ public class GWASCircle extends ReportDisplayer {
             Integer chromosomeLength = (Integer) row.get(2).getField();
             Integer markerStart = (Integer) row.get(3).getField();
             Integer markerEnd = (Integer) row.get(4).getField();
-            String phenotypeIdentifier = (String) row.get(5).getField();
+            String traitIdentifier = (String) row.get(5).getField();
             Double pValue = (Double) row.get(6).getField();
             // derived quantities
             int position = (markerStart+markerEnd)/2;
@@ -99,7 +99,7 @@ public class GWASCircle extends ReportDisplayer {
             // add to lists
             markerList.add(markerIdentifier);
             chromosomeList.add(chromosomeIdentifier);
-            phenotypeList.add(phenotypeIdentifier);
+            traitList.add(traitIdentifier);
             positionList.add(position);
             log10pList.add(log10p);
         }
@@ -107,7 +107,7 @@ public class GWASCircle extends ReportDisplayer {
         // send the data on its way
         request.setAttribute("markerList", markerList);
         request.setAttribute("chromosomeList", chromosomeList);
-        request.setAttribute("phenotypeList", phenotypeList);
+        request.setAttribute("traitList", traitList);
         request.setAttribute("positionList", positionList);
         request.setAttribute("log10pList", log10pList);
     }
