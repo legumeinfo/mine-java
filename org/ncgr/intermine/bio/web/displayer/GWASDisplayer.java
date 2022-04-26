@@ -205,6 +205,7 @@ public class GWASDisplayer extends ReportDisplayer {
 
         // send JSONObject back to gwasDisplayer.jsp
         JSONObject genomesJSON = new JSONObject(genomesMap);
+        request.setAttribute("genomes", genomes);
         request.setAttribute("genomesJSON", genomesJSON.toString());
     }
 }

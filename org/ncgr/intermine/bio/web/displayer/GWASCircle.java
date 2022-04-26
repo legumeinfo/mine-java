@@ -45,9 +45,9 @@ public class GWASCircle extends ReportDisplayer {
         InterMineObject gwas = reportObject.getObject();
         String gwasIdentifier;
         try {
-            gwasIdentifier = (String) gwas.getFieldValue("primaryIdentifier");
+            gwasIdentifier = (String) gwas.getFieldValue("identifier");
         } catch (IllegalAccessException ex) {
-            throw new RuntimeException("Error getting primaryIdentifier.", ex);
+            throw new RuntimeException("Error getting identifier.", ex);
         }
 
         PathQueryExecutor executor = im.getPathQueryExecutor();
@@ -75,7 +75,7 @@ public class GWASCircle extends ReportDisplayer {
                        "GWASResult.trait.primaryIdentifier",         // 5
                        "GWASResult.pValue"                               // 6
                        );
-        query.addConstraint(Constraints.eq("GWASResult.study.primaryIdentifier", gwasIdentifier));
+        query.addConstraint(Constraints.eq("GWASResult.gwas.identifier", gwasIdentifier));
         query.addOrderBy("GWASResult.marker.chromosome.primaryIdentifier", OrderDirection.ASC);
         query.addOrderBy("GWASResult.marker.primaryIdentifier", OrderDirection.ASC);
         ExportResultsIterator results;
