@@ -53,20 +53,20 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
     public void display(HttpServletRequest request, ReportObject reportObject) {
         String studyPrimaryIdentifier = (String) reportObject.getAttributes().get("primaryIdentifier"); 
 
-        // query the chromsome identifiers
-        // ASSUME MARKER
-        List<String> chrSecondaryIdentifiers = new LinkedList<>();
+        // query the chromsome names
+        // view="GenotypingRecord.markers.chromosome.name" sortOrder="GenotypingRecord.markers.chromosome.name asc">
+        List<String> chrNames = new LinkedList<>();
         PathQueryExecutor executor = im.getPathQueryExecutor();
         PathQuery query = new PathQuery(im.getModel());
-        query.addViews("GenotypingRecord.marker.chromosome.secondaryIdentifier"); // 0
+        query.addViews("GenotypingRecord.markers.chromosome.name"); // 0
         query.addConstraint(Constraints.eq("GenotypingRecord.study.primaryIdentifier", studyPrimaryIdentifier));
-        query.addOrderBy("GenotypingRecord.marker.chromosome.secondaryIdentifier", OrderDirection.ASC);
+        query.addOrderBy("GenotypingRecord.markers.chromosome.name", OrderDirection.ASC);
         try {
             ExportResultsIterator iterator = executor.execute(query);
             while (iterator.hasNext()) {
                 List<ResultElement> results = iterator.next();
-                String chr = (String) results.get(0).getField();
-                chrSecondaryIdentifiers.add(chr);
+                String name = (String) results.get(0).getField();
+                chrNames.add(name);
             }
         } catch (ObjectStoreException ex) {
             System.err.println(ex);
@@ -75,6 +75,6 @@ public class GenotypeMatrixDisplayer extends ReportDisplayer {
             
         // output
         request.setAttribute("studyPrimaryIdentifier", studyPrimaryIdentifier);
-        request.setAttribute("chrSecondaryIdentifiers", chrSecondaryIdentifiers);
+        request.setAttribute("chrNames", chrNames);
     }
 }
