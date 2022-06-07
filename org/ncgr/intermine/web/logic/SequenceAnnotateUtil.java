@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -21,7 +22,7 @@ import org.intermine.bio.web.export.ResidueFieldExporter;
 import org.intermine.model.InterMineObject;
 import org.intermine.model.bio.BioEntity;
 import org.intermine.model.bio.CDS;
-import org.intermine.model.bio.GeneFamily;
+import org.intermine.model.bio.GeneFamilyAssignment;
 import org.intermine.model.bio.Protein;
 import org.intermine.model.bio.Sequence;
 import org.intermine.model.bio.SequenceFeature;
@@ -39,13 +40,15 @@ import org.intermine.web.struts.InterMineAction;
  * @author Sam Hokin
  */
 public class SequenceAnnotateUtil {
+
     private static final String PROPERTY_DESCRIPTIONLINE = "description_line";
+
     private BioSequence bioSequence;
     private String method;
     private String identifier;
     private String objClass;
     private String sequenceType;
-    private String geneFamilyIdentifier;
+    private List<String> geneFamilyIdentifiers = new ArrayList<>();
     
     /**
      * Construct from an HttpServletRequest
@@ -61,7 +64,7 @@ public class SequenceAnnotateUtil {
         Properties webProps = (Properties) session.getServletContext().getAttribute(Constants.WEB_PROPERTIES);
         InterMineObject obj = getObject(os, webProps, objectId);
 
-        // find the object class
+        // HACK: find the object class
         List<String> objStrings = new LinkedList<>(obj.getoBJECT().getStrings());
         objClass = objStrings.get(0).substring(27);
 
@@ -69,15 +72,18 @@ public class SequenceAnnotateUtil {
         if (objClass.equals("CDS") || objClass.equals("Transcript") || objClass.equals("MRNA") || objClass.equals("Protein")) {
             if (objClass.equals("Protein")) {
                 Protein protein = (Protein) obj;
-                geneFamilyIdentifier = protein.getGeneFamily().getIdentifier();
+                Set <GeneFamilyAssignment> gfas = protein.getGeneFamilyAssignments();
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
             } else if (objClass.equals("Transcript") || objClass.equals("MRNA")) {
                 Transcript transcript = (Transcript) obj;
-                geneFamilyIdentifier = transcript.getGene().getGeneFamily().getIdentifier();
+                Set <GeneFamilyAssignment> gfas = transcript.getGene().getGeneFamilyAssignments();
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
             } else if (objClass.equals("CDS")) {
                 CDS cds = (CDS) obj;
-                geneFamilyIdentifier = cds.getGene().getGeneFamily().getIdentifier();
+                Set <GeneFamilyAssignment> gfas = cds.getGene().getGeneFamilyAssignments();
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
             }
-            if (geneFamilyIdentifier!=null) {
+            if (geneFamilyIdentifiers.size()>0) {
                 bioSequence = createBioSequence(obj);
                 if (bioSequence!=null) {
                     if (obj instanceof SequenceFeature) {
@@ -86,7 +92,11 @@ public class SequenceAnnotateUtil {
                         sequenceType = "p";
                     }
                     bioSequence.setAccession(new AccessionID((String) obj.getFieldValue("primaryIdentifier")));
+                } else {
+                    System.err.println("## bioSequence is null for object.");
                 }
+            } else {
+                System.err.println("## No gene family identifiers found for object.");
             }
         }
     }
@@ -115,8 +125,8 @@ public class SequenceAnnotateUtil {
     /**
      * Return the gene family identifier for this object
      */
-    public String getGeneFamilyIdentifier() {
-        return geneFamilyIdentifier;
+    public List<String> getGeneFamilyIdentifiers() {
+        return geneFamilyIdentifiers;
     }
 
     /**

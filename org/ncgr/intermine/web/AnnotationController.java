@@ -45,7 +45,7 @@ import org.intermine.web.logic.session.SessionMethods;
 import org.json.JSONObject;
 
 /**
- * Class that generates ANNOTATE button data on a list of CDSes, Transcript/MRNAs, or Proteins.
+ * Class that generates ANNOTATE button data on a list of CDSes, Transcripts/MRNAs, or Proteins.
  *
  * @author Sam Hokin
  */
@@ -81,9 +81,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "n";
             query.addView("CDS.primaryIdentifier");           // 0
             query.addView("CDS.sequence.residues");           // 1
-            query.addView("CDS.gene.geneFamily.identifier");  // 2
-            query.addView("CDS.gene.geneFamily.description"); // 3
-            query.addOrderBy("CDS.gene.geneFamily.identifier", OrderDirection.ASC);
+            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.identifier");  // 2
+            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.description"); // 3
+            query.addOrderBy("CDS.gene.geneFamilyAssignments.geneFamily.identifier", OrderDirection.ASC);
             query.addOrderBy("CDS.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("CDS", bag.getName()));
         } else if (bagType.equals("MRNA")) {
@@ -111,9 +111,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "p";
             query.addView("Protein.primaryIdentifier");      // 0
             query.addView("Protein.sequence.residues");      // 1
-            query.addView("Protein.geneFamily.identifier");  // 2
-            query.addView("Protein.geneFamily.description"); // 3
-            query.addOrderBy("Protein.geneFamily.identifier", OrderDirection.ASC);
+            query.addView("Protein.geneFamilyAssignments.geneFamily.identifier");  // 2
+            query.addView("Protein.geneFamilyAssignments.geneFamily.description"); // 3
+            query.addOrderBy("Protein.geneFamilyAssignments.geneFamily.identifier", OrderDirection.ASC);
             query.addOrderBy("Protein.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("Protein", bag.getName()));
         }
