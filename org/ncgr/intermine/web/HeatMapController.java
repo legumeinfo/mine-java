@@ -175,7 +175,7 @@ public class HeatMapController extends TilesAction {
                 List<ResultElement> valueRow = valuesResult.next();
                 String geneID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.feature.secondaryIdentifier
 		Integer num = (Integer) valueRow.get(1).getField();  // 1 ExpressionValue.sample.num
-                String sample = (String) valueRow.get(2).getField(); // 2 ExpressionValue.sample.primaryIdentifier
+                String sample = (String) valueRow.get(2).getField(); // 2 ExpressionValue.sample.identifier
 		Double value = (Double) valueRow.get(3).getField();  // 3 ExpressionValue.value
                 ExprValue expValue = new ExprValue(sample, num, value, geneID);
                 if (!expressionValueMap.containsKey(geneID)) {
@@ -326,7 +326,7 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve the sample primaryIdentifiers and descriptions for a given source.
+     * Create a path query to retrieve the sample identifiers and descriptions for a given source.
      *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
@@ -334,9 +334,9 @@ public class HeatMapController extends TilesAction {
      */
     PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSample.primaryIdentifier");
-        query.addView("ExpressionSample.description");
-        query.addView("ExpressionSample.name");
+        query.addView("ExpressionSample.identifier");   // 0
+        query.addView("ExpressionSample.description");  // 1
+        query.addView("ExpressionSample.name");         // 2
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
@@ -357,7 +357,7 @@ public class HeatMapController extends TilesAction {
         // Add views
         query.addView("ExpressionValue.feature.secondaryIdentifier"); // 0
 	query.addView("ExpressionValue.sample.num");                  // 1
-	query.addView("ExpressionValue.sample.primaryIdentifier");    // 2
+	query.addView("ExpressionValue.sample.identifier");           // 2
 	query.addView("ExpressionValue.value");                       // 3
         // Add orderby
 	query.addOrderBy("ExpressionValue.feature.secondaryIdentifier", OrderDirection.ASC);

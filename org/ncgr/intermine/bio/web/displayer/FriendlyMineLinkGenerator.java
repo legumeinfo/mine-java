@@ -158,7 +158,7 @@ public final class FriendlyMineLinkGenerator implements InterMineLinkGenerator {
 		       "Gene.secondaryIdentifier",
 		       "Gene.organism.shortName");
 	    q.addOrderBy("Gene.primaryIdentifier", OrderDirection.ASC);
-	    q.addConstraint(Constraints.eq("Gene.geneFamily.genes.primaryIdentifier", req.getIdentifier()), "A");
+	    q.addConstraint(Constraints.eq("Gene.geneFamilyAssignments.geneFamily.genes.primaryIdentifier", req.getIdentifier()), "A");
 	    // non-null description forces genes that the mine "specializes in"
 	    q.addConstraint(Constraints.isNotNull("Gene.description"), "B");
 	    q.setConstraintLogic("A and B");

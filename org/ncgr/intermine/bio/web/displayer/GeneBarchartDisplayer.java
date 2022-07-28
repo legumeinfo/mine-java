@@ -130,7 +130,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 if (row==null || row.get(0)==null || row.get(0).getField()==null) {
                     throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    String sample = (String) row.get(0).getField();      // 0 ExpressionSample.primaryIdentifier
+                    String sample = (String) row.get(0).getField();      // 0 ExpressionSample.identifier
                     String description = (String) row.get(1).getField(); // 1 ExpressionSample.description
                     samples.add(sample);
                     sampleDescriptions.put(sample, description);
@@ -153,7 +153,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             while (valuesResult.hasNext()) {
                 List<ResultElement> row = valuesResult.next();
                 Integer num = (Integer) row.get(0).getField();        // 0 Gene.expressionValues.sample.num
-                String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.primaryIdentifier
+                String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.identifier
                 Double value = (Double) row.get(2).getField();        // 2 Gene.expressionValues.value
                 ExprValue eval = new ExprValue(sample, num, value, geneID);
                 exprValues.add(eval);
@@ -215,7 +215,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve the samples = ExpressionSample.primaryIdentifier.
+     * Create a path query to retrieve the samples = ExpressionSample.identifier.
      *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
@@ -223,8 +223,8 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      */
     private PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSample.primaryIdentifier"); // 0
-        query.addView("ExpressionSample.description");       // 1
+        query.addView("ExpressionSample.identifier");   // 0
+        query.addView("ExpressionSample.description");  // 1
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
@@ -260,9 +260,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         // Add views
         query.addViews(
-                       "ExpressionValue.sample.num",                  // 0
-                       "ExpressionValue.sample.primaryIdentifier",    // 1
-                       "ExpressionValue.value"                        // 2
+                       "ExpressionValue.sample.num",         // 0
+                       "ExpressionValue.sample.identifier",  // 1
+                       "ExpressionValue.value"               // 2
                        );
         // Add orderby
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
