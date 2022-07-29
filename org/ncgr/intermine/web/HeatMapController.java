@@ -97,6 +97,9 @@ public class HeatMapController extends TilesAction {
         List<Integer> geneCounts = new LinkedList<>();
         List<Integer> sampleCounts = new LinkedList<>();
 
+        // store a map of Gene.secondaryIdentifier to Gene.primaryIdentifier for utility purposes on widget
+        Map<String, String> genePrimaryIDMap = new LinkedHashMap<>();
+
         // query ALL the sources and load the ones with enough genes (more than two)
         PathQuery sourcesQuery = querySources(model, bag);
         ExportResultsIterator sourcesResult;
@@ -173,12 +176,15 @@ public class HeatMapController extends TilesAction {
             }
             while (valuesResult.hasNext()) {
                 List<ResultElement> valueRow = valuesResult.next();
-                String geneID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.feature.secondaryIdentifier
-		Integer num = (Integer) valueRow.get(1).getField();  // 1 ExpressionValue.sample.num
-                String sample = (String) valueRow.get(2).getField(); // 2 ExpressionValue.sample.identifier
-		Double value = (Double) valueRow.get(3).getField();  // 3 ExpressionValue.value
+                String genePrimaryID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.feature.primaryIdentifier
+                String geneID = (String) valueRow.get(1).getField();        // 1 ExpressionValue.feature.secondaryIdentifier
+		Integer num = (Integer) valueRow.get(2).getField();         // 2 ExpressionValue.sample.num
+                String sample = (String) valueRow.get(3).getField();        // 3 ExpressionValue.sample.identifier
+		Double value = (Double) valueRow.get(4).getField();         // 4 ExpressionValue.value
                 ExprValue expValue = new ExprValue(sample, num, value, geneID);
                 if (!expressionValueMap.containsKey(geneID)) {
+                    // put the gene primary identifier into the map
+                    genePrimaryIDMap.put(geneID, genePrimaryID);
                     // create a new list with space for n (size of samples) ExpressionValues
                     List<ExprValue> expressionValueList = new ArrayList<>(Collections.nCopies(samples.size(), new ExprValue()));
                     expressionValueList.set(samples.indexOf(sample), expValue);
@@ -284,9 +290,10 @@ public class HeatMapController extends TilesAction {
         // set the return attributes
         request.setAttribute("errorMessage", "");
         request.setAttribute("sources", sources);
-        request.setAttribute("sourcesJSON", sourcesJSON);
+        request.setAttribute("genePrimaryIDMap", genePrimaryIDMap);
         request.setAttribute("geneCounts", geneCounts);
         request.setAttribute("sampleCounts", sampleCounts);
+        request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("expressionJSON", expressionJSON);
         request.setAttribute("descriptionsJSON", descriptionsJSON);
         request.setAttribute("namesJSON", namesJSON);
@@ -355,10 +362,11 @@ public class HeatMapController extends TilesAction {
     PathQuery queryExpressionValues(Model model, String source, InterMineBag bag) {
         PathQuery query = new PathQuery(model);
         // Add views
-        query.addView("ExpressionValue.feature.secondaryIdentifier"); // 0
-	query.addView("ExpressionValue.sample.num");                  // 1
-	query.addView("ExpressionValue.sample.identifier");           // 2
-	query.addView("ExpressionValue.value");                       // 3
+        query.addView("ExpressionValue.feature.primaryIdentifier");   // 0
+        query.addView("ExpressionValue.feature.secondaryIdentifier"); // 1
+	query.addView("ExpressionValue.sample.num");                  // 2
+	query.addView("ExpressionValue.sample.identifier");           // 3
+	query.addView("ExpressionValue.value");                       // 4
         // Add orderby
 	query.addOrderBy("ExpressionValue.feature.secondaryIdentifier", OrderDirection.ASC);
         query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
