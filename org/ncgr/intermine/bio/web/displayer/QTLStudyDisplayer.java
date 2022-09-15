@@ -42,7 +42,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve the linkage groups associated with this QTLStudy.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.primaryIdentifier
+     * 1:LinkageGroup.identifier
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -53,7 +53,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
     PathQuery getLinkageGroupQuery(Model model, int reportId) {
         PathQuery query = new PathQuery(model);
         query.addViews("QTLStudy.qtls.linkageGroup.id",
-                       "QTLStudy.qtls.linkageGroup.primaryIdentifier",
+                       "QTLStudy.qtls.linkageGroup.identifier",
                        "QTLStudy.qtls.linkageGroup.length");
         query.addConstraint(Constraints.eq("QTLStudy.id", String.valueOf(reportId)));
         query.addOrderBy("QTLStudy.qtls.linkageGroup.number", OrderDirection.ASC);
@@ -64,7 +64,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve the QTLs in this QTLStudy on the given LinkageGroup.
      *
      * 0:QTL.id
-     * 1:QTL.primaryIdentifier
+     * 1:QTL.identifier
      * 2:QTL.start
      * 3:QTL.end
      *
@@ -76,10 +76,10 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
     @Override
     PathQuery getQTLQuery(Model model, int lgId, int reportId) {
         PathQuery query = new PathQuery(model);
-        query.addViews("QTLStudy.qtls.id",                  // 0
-                       "QTLStudy.qtls.primaryIdentifier",   // 1
-                       "QTLStudy.qtls.start",               // 2
-                       "QTLStudy.qtls.end");                // 3
+        query.addViews("QTLStudy.qtls.id",           // 0
+                       "QTLStudy.qtls.identifier",   // 1
+                       "QTLStudy.qtls.start",        // 2
+                       "QTLStudy.qtls.end");         // 3
         query.addConstraint(Constraints.eq("QTLStudy.id", String.valueOf(reportId)));
         query.addConstraint(Constraints.eq("QTLStudy.qtls.linkageGroup.id", String.valueOf(lgId)));
         query.addOrderBy("QTLStudy.qtls.start", OrderDirection.ASC);
@@ -97,7 +97,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
      * @param model the model
      * @param lgId  the linkage group id
      * @param markerNames a Set of marker names, null if querying all markers on the linkage group
-     * @return the path query
+     * @return the path query, or null if there are no markers
      */
     @Override
     PathQuery getLinkageGroupPositionQuery(Model model, int lgId, int reportId) {
@@ -112,13 +112,17 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
             while (qtlResult.hasNext()) {
                 List<ResultElement> row = qtlResult.next();
                 String markerNames = (String) row.get(0).getField(); // 0:QTL.markerNames
-                for (String markerName : markerNames.split("\\|")) {
-                    markerNameSet.add(markerName);
+                if (markerNames!=null) {
+                    for (String markerName : markerNames.split("\\|")) {
+                        markerNameSet.add(markerName);
+                    }
                 }
             }
         } catch (ObjectStoreException ex) {
             throw new RuntimeException("Error retrieving QTL.markerNames:", ex);
         }
+        // abort if no markers
+        if (markerNameSet.size()==0) return null;
         // constrain the query to have marker from markerNames located on the QTL's linkage group
         PathQuery query = new PathQuery(model);
         query.addViews("LinkageGroupPosition.id",         // 0

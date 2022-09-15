@@ -42,7 +42,7 @@ public class LinkageGroupDisplayer extends GeneticDisplayer {
      * Create a path query to retrieve linkage groups associated with a given genetic map, QTL or even a single linkage group Id.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.primaryIdentifier
+     * 1:LinkageGroup.identifier
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -53,7 +53,7 @@ public class LinkageGroupDisplayer extends GeneticDisplayer {
     PathQuery getLinkageGroupQuery(Model model, int reportId) {
         PathQuery query = new PathQuery(model);
         query.addViews("LinkageGroup.id",
-                       "LinkageGroup.primaryIdentifier",
+                       "LinkageGroup.identifier",
                        "LinkageGroup.length");
         query.addConstraint(Constraints.eq("LinkageGroup.id", String.valueOf(reportId)));
         query.addOrderBy("LinkageGroup.number", OrderDirection.ASC);
@@ -88,7 +88,7 @@ public class LinkageGroupDisplayer extends GeneticDisplayer {
      * Create a path query to retrieve QTLs associated with a given linkage group.
      *
      * 0:QTL.id
-     * 1:QTL.primaryIdentifier
+     * 1:QTL.identifier
      * 2:QTL.start
      * 3:QTL.end
      *
@@ -101,7 +101,7 @@ public class LinkageGroupDisplayer extends GeneticDisplayer {
     PathQuery getQTLQuery(Model model, int lgId, int reportId) {
         PathQuery query = new PathQuery(model);
         query.addViews("QTL.id",                  // 0
-                       "QTL.primaryIdentifier",   // 1
+                       "QTL.identifier",          // 1
                        "QTL.start",               // 2
                        "QTL.end");                // 3
         query.addConstraint(Constraints.eq("QTL.linkageGroup.id", String.valueOf(lgId)));

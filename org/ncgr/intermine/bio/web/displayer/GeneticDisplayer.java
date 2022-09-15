@@ -95,18 +95,21 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
         for (Integer lgId : lgMap.keySet()) {
             Map<Integer,List<ResultElement>> linkageGroupPositions = new LinkedHashMap<Integer,List<ResultElement>>();
             PathQuery lgpQuery = getLinkageGroupPositionQuery(im.getModel(), lgId, reportObject.getId());
-            try {
-                ExportResultsIterator lgpResult = executor.execute(lgpQuery);
-                while (lgpResult.hasNext()) {
-                    List<ResultElement> row = lgpResult.next();
-                    Integer id = (Integer) row.get(0).getField(); // 0:LinkageGroupPosition.id
-                    linkageGroupPositions.put(id, row);
+            // lgpQuery==null if there are no markers
+            if (lgpQuery!=null) {
+                try {
+                    ExportResultsIterator lgpResult = executor.execute(lgpQuery);
+                    while (lgpResult.hasNext()) {
+                        List<ResultElement> row = lgpResult.next();
+                        Integer id = (Integer) row.get(0).getField(); // 0:LinkageGroupPosition.id
+                        linkageGroupPositions.put(id, row);
+                    }
+                } catch (ObjectStoreException ex) {
+                    throw new RuntimeException("Error retrieving data with lgpQuery:", ex);
                 }
-            } catch (ObjectStoreException ex) {
-                throw new RuntimeException("Error retrieving data with lgpQuery:", ex);
-            }
-            if (linkageGroupPositions.size()>0) {
-                lgLinkageGroupPositionMap.put(lgId, linkageGroupPositions);
+                if (linkageGroupPositions.size()>0) {
+                    lgLinkageGroupPositionMap.put(lgId, linkageGroupPositions);
+                }
             }
         }
 
@@ -120,7 +123,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
             double[] length = new double[2];
             length[0] = 0.0;
             List<ResultElement> lgRow = lgMap.get(lgId);
-            String lgIdentifier = (String) lgRow.get(1).getField();  // 1:LinkageGroup.primaryIdentifier
+            String lgIdentifier = (String) lgRow.get(1).getField();  // 1:LinkageGroup.identifier
             length[1] = (double) (Double) lgRow.get(2).getField();   // 2:LinkageGroup.length
             // determine max LG length for plotting purposes
             if (length[1]>maxLGLength) maxLGLength = length[1];
@@ -176,7 +179,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
                     // the data
                     double[] span = new double[2];
                     List<ResultElement> qtlRow = qtls.get(qtlId);
-                    String qtlIdentifier = (String) qtlRow.get(1).getField(); // 1:QTL.primaryIdentifier
+                    String qtlIdentifier = (String) qtlRow.get(1).getField(); // 1:QTL.identifier
                     span[0] = (double) (Double) qtlRow.get(2).getField();     // 2:QTL.start
                     span[1] = (double) (Double) qtlRow.get(3).getField();     // 3:QTL.end
                     // the track data
@@ -212,7 +215,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
      * Return a path query to retrieve linkage groups associated with this report.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.primaryIdentifier
+     * 1:LinkageGroup.identifier
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -239,7 +242,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
      * Return a path query to retrieve QTLs associated with a given linkage group.
      *
      * 0:QTL.id
-     * 1:QTL.primaryIdentifier
+     * 1:QTL.identifier
      * 2:QTL.start
      * 3:QTL.end
      *

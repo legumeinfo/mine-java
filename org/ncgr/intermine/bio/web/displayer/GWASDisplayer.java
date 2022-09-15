@@ -66,9 +66,9 @@ public class GWASDisplayer extends ReportDisplayer {
         PathQuery gwasResultQuery = new PathQuery(im.getModel());
         gwasResultQuery.addView("GWASResult.pValue");                  // 0
         gwasResultQuery.addView("GWASResult.markerName");              // 1
-        gwasResultQuery.addView("GWASResult.trait.primaryIdentifier"); // 2
+        gwasResultQuery.addView("GWASResult.trait.name"); // 2
         gwasResultQuery.addConstraint(Constraints.eq("GWASResult.gwas.primaryIdentifier", gwasIdentifier));
-        gwasResultQuery.addOrderBy("GWASResult.trait.primaryIdentifier", OrderDirection.ASC);
+        gwasResultQuery.addOrderBy("GWASResult.trait.name", OrderDirection.ASC);
         try {
             ExportResultsIterator gwasResults = executor.execute(gwasResultQuery);
             while (gwasResults.hasNext()) {
