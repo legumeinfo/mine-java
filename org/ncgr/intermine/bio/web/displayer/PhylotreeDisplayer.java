@@ -50,9 +50,9 @@ public class PhylotreeDisplayer extends ReportDisplayer {
         InterMineObject obj = reportObject.getObject();
         String objIdentifier;
         try {
-            objIdentifier = (String) obj.getFieldValue("identifier");
+            objIdentifier = (String) obj.getFieldValue("primaryIdentifier");
         } catch (IllegalAccessException ex) {
-            throw new RuntimeException("Error getting identifier from reportObject.", ex);
+            throw new RuntimeException("Error getting primaryIdentifier from reportObject.", ex);
         }
 
         // query the Newick string with the same identifier

@@ -73,15 +73,15 @@ public class SequenceAnnotateUtil {
             if (objClass.equals("Protein")) {
                 Protein protein = (Protein) obj;
                 Set <GeneFamilyAssignment> gfas = protein.getGeneFamilyAssignments();
-                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getPrimaryIdentifier());
             } else if (objClass.equals("Transcript") || objClass.equals("MRNA")) {
                 Transcript transcript = (Transcript) obj;
                 Set <GeneFamilyAssignment> gfas = transcript.getGene().getGeneFamilyAssignments();
-                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getPrimaryIdentifier());
             } else if (objClass.equals("CDS")) {
                 CDS cds = (CDS) obj;
                 Set <GeneFamilyAssignment> gfas = cds.getGene().getGeneFamilyAssignments();
-                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getIdentifier());
+                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getPrimaryIdentifier());
             }
             if (geneFamilyIdentifiers.size()>0) {
                 bioSequence = createBioSequence(obj);
