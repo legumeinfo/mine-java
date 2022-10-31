@@ -81,9 +81,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "n";
             query.addView("CDS.primaryIdentifier");           // 0
             query.addView("CDS.sequence.residues");           // 1
-            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.identifier");  // 2
+            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.primaryIdentifier");  // 2
             query.addView("CDS.gene.geneFamilyAssignments.geneFamily.description"); // 3
-            query.addOrderBy("CDS.gene.geneFamilyAssignments.geneFamily.identifier", OrderDirection.ASC);
+            query.addOrderBy("CDS.gene.geneFamilyAssignments.geneFamily.primaryIdentifier", OrderDirection.ASC);
             query.addOrderBy("CDS.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("CDS", bag.getName()));
         } else if (bagType.equals("MRNA")) {
@@ -91,9 +91,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "n";
             query.addView("MRNA.primaryIdentifier");           // 0
             query.addView("MRNA.sequence.residues");           // 1
-            query.addView("MRNA.gene.geneFamily.identifier");  // 2
+            query.addView("MRNA.gene.geneFamily.primaryIdentifier");  // 2
             query.addView("MRNA.gene.geneFamily.description"); // 3
-            query.addOrderBy("MRNA.gene.geneFamily.identifier", OrderDirection.ASC);
+            query.addOrderBy("MRNA.gene.geneFamily.primaryIdentifier", OrderDirection.ASC);
             query.addOrderBy("MRNA.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("MRNA", bag.getName()));
         } else if (bagType.equals("Transcript")) {
@@ -101,9 +101,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "n";
             query.addView("Transcript.primaryIdentifier");           // 0
             query.addView("Transcript.sequence.residues");           // 1
-            query.addView("Transcript.gene.geneFamily.identifier");  // 2
+            query.addView("Transcript.gene.geneFamily.primaryIdentifier");  // 2
             query.addView("Transcript.gene.geneFamily.description"); // 3
-            query.addOrderBy("Transcript.gene.geneFamily.identifier", OrderDirection.ASC);
+            query.addOrderBy("Transcript.gene.geneFamily.primaryIdentifier", OrderDirection.ASC);
             query.addOrderBy("Transcript.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("Transcript", bag.getName()));
         } else if (bagType.equals("Protein")) {
@@ -111,9 +111,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "p";
             query.addView("Protein.primaryIdentifier");      // 0
             query.addView("Protein.sequence.residues");      // 1
-            query.addView("Protein.geneFamilyAssignments.geneFamily.identifier");  // 2
+            query.addView("Protein.geneFamilyAssignments.geneFamily.primaryIdentifier");  // 2
             query.addView("Protein.geneFamilyAssignments.geneFamily.description"); // 3
-            query.addOrderBy("Protein.geneFamilyAssignments.geneFamily.identifier", OrderDirection.ASC);
+            query.addOrderBy("Protein.geneFamilyAssignments.geneFamily.primaryIdentifier", OrderDirection.ASC);
             query.addOrderBy("Protein.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("Protein", bag.getName()));
         }
@@ -125,7 +125,7 @@ public class AnnotationController extends TilesAction {
             throw new RuntimeException(errorMessage);
         }
 
-        // load results into a map of multi-FASTAs keyed by GeneFamily.identifier as well as a map of sequence count
+        // load results into a map of multi-FASTAs keyed by GeneFamily.primaryIdentifier as well as a map of sequence count
         Map<String,String> multiFastaMap = new HashMap<>();
         Map<String,Integer> countMap = new HashMap<>();
         Map<String,String> geneFamilyDescriptionMap = new HashMap<>();
