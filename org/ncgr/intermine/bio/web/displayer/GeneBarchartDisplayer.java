@@ -215,7 +215,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve the samples = ExpressionSample.identifier.
+     * Create a path query to retrieve the sample identifier = ExpressionSample.name.
      *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
@@ -223,7 +223,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      */
     private PathQuery querySamples(Model model, String source) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSample.identifier");   // 0
+        query.addView("ExpressionSample.name");         // 0
         query.addView("ExpressionSample.description");  // 1
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
