@@ -61,9 +61,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         }
 
         // query the sources, since we may have more than one, put them in a list of JSONs
-        List<String> sources = new LinkedList<String>();
-        List<String> sourcesJSON = new LinkedList<String>();
-        PathQuery sourcesQuery = querySources(model, geneID);
+        List<String> sources = new LinkedList<>();
+        List<String> sourcesJSON = new LinkedList<>();
+        PathQuery sourcesQuery = getSourcesQuery(model, geneID);
         ExportResultsIterator sourcesResult;
         try {
             sourcesResult = executor.execute(sourcesQuery);
@@ -79,29 +79,33 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         while (sourcesResult.hasNext()) {
             List<ResultElement> row = sourcesResult.next();
             if (row==null || row.get(0)==null || row.get(0).getField()==null) {
-                throw new RuntimeException("Null row or row element retrieving samples.");
+                throw new RuntimeException("Null row or row element retrieving sources.");
             } else {
-                Integer id = (Integer)row.get(0).getField();       // 0 ExpressionValue.sample.source.id
-                String identifier = (String)row.get(1).getField(); // 1 ExpressionValue.sample.source.primaryIdentifier
-                // load out stuff
-                Map<String,Object> jsonMap = new LinkedHashMap<String,Object>();
+                Integer id = (Integer) row.get(0).getField();       // 0 ExpressionValue.sample.source.id
+                String identifier = (String) row.get(1).getField(); // 1 ExpressionValue.sample.source.primaryIdentifier
+                String synopsis = (String) row.get(2).getField();   // 2 ExpressionValue.sample.source.synopsis
+                // load our stuff
+                Map<String,Object> jsonMap = new LinkedHashMap<>();
                 jsonMap.put("id", id);
                 jsonMap.put("identifier", identifier);
+                jsonMap.put("synopsis", synopsis);
                 sources.add(identifier);
                 sourcesJSON.add(new JSONObject(jsonMap).toString());
             }
         }
 
         // we'll store the JSON blocks in a string list
-        List<String> jsonList = new LinkedList<String>();
-        // and the sample descriptions in another list
-        List<String> descriptionsList = new LinkedList<String>();
-        // and the expression unit in another list
+        List<String> jsonList = new LinkedList<>();
+        // and the various sample descriptive stuff in their own descriptions in their own lists
+        List<String> descriptionsList = new LinkedList<>();
+        List<String> tissuesList = new LinkedList<>();
+        List<String> treatmentsList = new LinkedList<>();
+        List<String> genotypesList = new LinkedList<>();
         List<String> unitsList = new LinkedList<String>();
         // now loop over the sources to get unit, samples, and expression
         for (String source : sources) {
             // query the expression unit for this source
-            PathQuery unitQuery = queryExpressionUnit(model, source);
+            PathQuery unitQuery = getExpressionUnitQuery(model, source);
             ExportResultsIterator unitResult;
             try {
                 unitResult = executor.execute(unitQuery);
@@ -116,9 +120,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 unitsList.add(unit);
             }
             // query the samples for this source, put them in a list
-            List<String> samples = new LinkedList<String>();
-            Map<String,String> sampleDescriptions = new LinkedHashMap<String,String>();
-            PathQuery samplesQuery = querySamples(model, source);
+            List<String> samples = new LinkedList<>();
+            Map<String,String> sampleDescriptions = new LinkedHashMap<>();
+            Map<String,String> sampleTissues = new LinkedHashMap<>();
+            Map<String,String> sampleTreatments = new LinkedHashMap<>();
+            Map<String,String> sampleGenotypes = new LinkedHashMap<>();
+            PathQuery samplesQuery = getSamplesQuery(model, source);
             ExportResultsIterator samplesResult;
             try {
                 samplesResult = executor.execute(samplesQuery);
@@ -130,10 +137,16 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 if (row==null || row.get(0)==null || row.get(0).getField()==null) {
                     throw new RuntimeException("Null row or row element retrieving samples.");
                 } else {
-                    String sample = (String) row.get(0).getField();      // 0 ExpressionSample.identifier
+                    String sample = (String) row.get(0).getField();      // 0 ExpressionSample.name
                     String description = (String) row.get(1).getField(); // 1 ExpressionSample.description
+                    String tissue = (String) row.get(2).getField();      // 2 ExpressionSample.tissue
+                    String treatment = (String) row.get(3).getField();   // 3 ExpressionSample.treatment
+                    String genotype = (String) row.get(4).getField();    // 4 ExpressionSample.genotype
                     samples.add(sample);
                     sampleDescriptions.put(sample, description);
+                    sampleTissues.put(sample, tissue);
+                    sampleTreatments.put(sample, treatment);
+                    sampleGenotypes.put(sample, genotype);
                 }
             }
             // if no samples return an empty JSON string and bail
@@ -142,8 +155,8 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 return;
             }
             // query the expression values for this source and gene, put them in a list
-            PathQuery valuesQuery = queryExpressionValuesForGene(model, source, geneID);
-            List<ExprValue> exprValues = new LinkedList<ExprValue>();
+            PathQuery valuesQuery = getExpressionValuesQuery(model, source, geneID);
+            List<ExprValue> exprValues = new LinkedList<>();
             ExportResultsIterator valuesResult;
             try {
                 valuesResult = executor.execute(valuesQuery);
@@ -164,7 +177,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 return;
             }
             // canvasXpress "vars" = gene (just one)
-            List<String> vars = new LinkedList<String>();
+            List<String> vars = new LinkedList<>();
             vars.add(geneID);
             // canvasXpress "data"
             double[][] data = new double[1][samples.size()];
@@ -176,8 +189,8 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 }
             }
             // put the canvasXpress data into the JSONObject
-            Map<String, Object> yInBarchartData =  new LinkedHashMap<String, Object>();
-            Map<String, Object> barchartData = new LinkedHashMap<String, Object>();
+            Map<String, Object> yInBarchartData =  new LinkedHashMap<>();
+            Map<String, Object> barchartData = new LinkedHashMap<>();
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
             yInBarchartData.put("data", data);
@@ -186,15 +199,25 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             JSONObject jo = new JSONObject(barchartData);
             // add this JSON to the list of JSONs
             jsonList.add(jo.toString());
-            // add the the sample descriptions to the list
+            // add the the sample descriptions, tissues, treatments, genotypes to their lists
             JSONObject descriptionsJSON = new JSONObject(sampleDescriptions);
+            JSONObject tissuesJSON = new JSONObject(sampleTissues);
+            JSONObject treatmentsJSON = new JSONObject(sampleTreatments);
+            JSONObject genotypesJSON = new JSONObject(sampleGenotypes);
+            // add the various descriptive JSONs to their lists
             descriptionsList.add(descriptionsJSON.toString());
+            tissuesList.add(tissuesJSON.toString());
+            treatmentsList.add(treatmentsJSON.toString());
+            genotypesList.add(genotypesJSON.toString());
         }
         // set the return attributes
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
         request.setAttribute("descriptionsList", descriptionsList);
+        request.setAttribute("tissuesList", tissuesList);
+        request.setAttribute("treatmentsList", treatmentsList);
+        request.setAttribute("genotypesList", genotypesList);
         request.setAttribute("unitsList", unitsList);
     }
 
@@ -205,10 +228,11 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      * @param geneID the gene for which sources are queried
      * @return the path query
      */
-    private PathQuery querySources(Model model, String geneID) {
+    private PathQuery getSourcesQuery(Model model, String geneID) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionValue.sample.source.id");                // 0
         query.addView("ExpressionValue.sample.source.primaryIdentifier"); // 1
+        query.addView("ExpressionValue.sample.source.synopsis");          // 2
         query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
         query.addOrderBy("ExpressionValue.sample.source.primaryIdentifier", OrderDirection.ASC);
         return query;
@@ -217,14 +241,32 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     /**
      * Create a path query to retrieve the sample identifier = ExpressionSample.name.
      *
+     * <attribute name="name" type="java.lang.String"/>
+     * <attribute name="description" type="java.lang.String"/>
+     * <attribute name="tissue" type="java.lang.String"/>
+     * <attribute name="treatment" type="java.lang.String"/>
+     * <attribute name="genotype" type="java.lang.String"/>
+     *
+     * <attribute name="num" type="java.lang.Integer"/>
+     * <attribute name="identifier" type="java.lang.String"/>
+     * <attribute name="replicateGroup" type="java.lang.String"/>
+     * <attribute name="bioSample" type="java.lang.String"/>
+     * <attribute name="sraExperiment" type="java.lang.String"/>
+     * <attribute name="species" type="java.lang.String"/>
+     * <attribute name="developmentStage" type="java.lang.String"/>
+     * <reference name="source" referenced-type="ExpressionSource" reverse-reference="samples"/>
+     *
      * @param model the model
      * @param source the primaryIdentifier of the expression source
      * @return the path query
      */
-    private PathQuery querySamples(Model model, String source) {
+    private PathQuery getSamplesQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
         query.addView("ExpressionSample.name");         // 0
         query.addView("ExpressionSample.description");  // 1
+        query.addView("ExpressionSample.tissue");       // 2
+        query.addView("ExpressionSample.treatment");    // 3
+        query.addView("ExpressionSample.genotype");     // 4
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
@@ -237,7 +279,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      * @param source the identifier of the ExpressionSource
      * @return the path query
      */
-    PathQuery queryExpressionUnit(Model model, String source) {
+    PathQuery getExpressionUnitQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
         // Add views
         query.addView("ExpressionValue.unit"); // 0
@@ -256,7 +298,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      * @param geneID the gene primaryIdentifier
      * @return the path query
      */
-    private PathQuery queryExpressionValuesForGene(Model model, String source, String geneID) {
+    private PathQuery getExpressionValuesQuery(Model model, String source, String geneID) {
         PathQuery query = new PathQuery(model);
         // Add views
         query.addViews(
