@@ -125,6 +125,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             Map<String,String> sampleTissues = new LinkedHashMap<>();
             Map<String,String> sampleTreatments = new LinkedHashMap<>();
             Map<String,String> sampleGenotypes = new LinkedHashMap<>();
+            List<String> sampleRepgroups = new LinkedList<>();
             PathQuery samplesQuery = getSamplesQuery(model, source);
             ExportResultsIterator samplesResult;
             try {
@@ -142,7 +143,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                     String tissue = (String) row.get(2).getField();      // 2 ExpressionSample.tissue
                     String treatment = (String) row.get(3).getField();   // 3 ExpressionSample.treatment
                     String genotype = (String) row.get(4).getField();    // 4 ExpressionSample.genotype
+                    String repgroup = (String) row.get(5).getField();    // 5 ExpressionSample.repgroup
                     samples.add(sample);
+                    sampleRepgroups.add(repgroup);
                     sampleDescriptions.put(sample, description);
                     sampleTissues.put(sample, tissue);
                     sampleTreatments.put(sample, treatment);
@@ -189,11 +192,14 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                 }
             }
             // put the canvasXpress data into the JSONObject
+            Map<String, Object> xInBarchartData = new LinkedHashMap<>();
             Map<String, Object> yInBarchartData =  new LinkedHashMap<>();
             Map<String, Object> barchartData = new LinkedHashMap<>();
+            xInBarchartData.put("repgroup", sampleRepgroups);
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
             yInBarchartData.put("data", data);
+            barchartData.put("x", xInBarchartData);
             barchartData.put("y", yInBarchartData);
             // the JSON data
             JSONObject jo = new JSONObject(barchartData);
@@ -214,11 +220,11 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         request.setAttribute("sources", sources);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("jsonList", jsonList);
+        request.setAttribute("unitsList", unitsList);
         request.setAttribute("descriptionsList", descriptionsList);
         request.setAttribute("tissuesList", tissuesList);
         request.setAttribute("treatmentsList", treatmentsList);
         request.setAttribute("genotypesList", genotypesList);
-        request.setAttribute("unitsList", unitsList);
     }
 
     /**
@@ -246,10 +252,10 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      * <attribute name="tissue" type="java.lang.String"/>
      * <attribute name="treatment" type="java.lang.String"/>
      * <attribute name="genotype" type="java.lang.String"/>
+     * <attribute name="replicateGroup" type="java.lang.String"/>
      *
      * <attribute name="num" type="java.lang.Integer"/>
      * <attribute name="identifier" type="java.lang.String"/>
-     * <attribute name="replicateGroup" type="java.lang.String"/>
      * <attribute name="bioSample" type="java.lang.String"/>
      * <attribute name="sraExperiment" type="java.lang.String"/>
      * <attribute name="species" type="java.lang.String"/>
@@ -262,11 +268,12 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      */
     private PathQuery getSamplesQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSample.name");         // 0
-        query.addView("ExpressionSample.description");  // 1
-        query.addView("ExpressionSample.tissue");       // 2
-        query.addView("ExpressionSample.treatment");    // 3
-        query.addView("ExpressionSample.genotype");     // 4
+        query.addView("ExpressionSample.name");           // 0
+        query.addView("ExpressionSample.description");    // 1
+        query.addView("ExpressionSample.tissue");         // 2
+        query.addView("ExpressionSample.treatment");      // 3
+        query.addView("ExpressionSample.genotype");       // 4
+        query.addView("ExpressionSample.replicateGroup"); // 5
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
         query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
         return query;
