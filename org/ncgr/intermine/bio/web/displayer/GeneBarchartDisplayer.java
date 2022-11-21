@@ -279,7 +279,8 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         query.addView("ExpressionSample.genotype");       // 4
         query.addView("ExpressionSample.replicateGroup"); // 5
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
-        query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
+        query.addOrderBy("ExpressionSample.replicateGroup", OrderDirection.ASC);
+        query.addOrderBy("ExpressionSample.name", OrderDirection.ASC);
         return query;
     }
 
@@ -318,7 +319,8 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                        "ExpressionValue.value"               // 2
                        );
         // Add orderby
-        query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.replicateGroup", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.name", OrderDirection.ASC);
         // Add constraints and you can edit the constraint values below
         query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.eq("ExpressionValue.feature.primaryIdentifier", geneID));
