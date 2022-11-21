@@ -145,7 +145,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
                     String genotype = (String) row.get(4).getField();    // 4 ExpressionSample.genotype
                     String repgroup = (String) row.get(5).getField();    // 5 ExpressionSample.repgroup
                     samples.add(sample);
-                    sampleRepgroups.add(repgroup);
+                    if (repgroup!=null) {
+                        sampleRepgroups.add(repgroup);
+                    }
                     sampleDescriptions.put(sample, description);
                     sampleTissues.put(sample, tissue);
                     sampleTreatments.put(sample, treatment);
@@ -195,7 +197,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             Map<String, Object> xInBarchartData = new LinkedHashMap<>();
             Map<String, Object> yInBarchartData =  new LinkedHashMap<>();
             Map<String, Object> barchartData = new LinkedHashMap<>();
-            xInBarchartData.put("repgroup", sampleRepgroups);
+            if (sampleRepgroups.size()>0) {
+                xInBarchartData.put("repgroup", sampleRepgroups);
+            }
             yInBarchartData.put("vars", vars);
             yInBarchartData.put("smps", samples);
             yInBarchartData.put("data", data);
