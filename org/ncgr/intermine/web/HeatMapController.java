@@ -110,7 +110,6 @@ public class HeatMapController extends TilesAction {
             return null;
         }
         if (!sourcesResult.hasNext()) {
-            setErrorMessage(request, sourcesQuery);
             return null;
         }
         while (sourcesResult.hasNext()) {
