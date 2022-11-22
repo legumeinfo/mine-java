@@ -47,9 +47,6 @@ import org.intermine.web.logic.session.SessionMethods;
 
 import org.json.JSONObject;
 
-import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
-import org.apache.commons.math3.stat.descriptive.moment.Mean;
-
 /**
  * Class that generates CanvasXpress heat map data for a list of genes.
  *
@@ -97,8 +94,9 @@ public class HeatMapController extends TilesAction {
         List<Integer> geneCounts = new LinkedList<>();
         List<Integer> sampleCounts = new LinkedList<>();
 
-        // store a map of Gene.name to Gene.primaryIdentifier for utility purposes on widget
-        Map<String, String> genePrimaryIDMap = new LinkedHashMap<>();
+        // store a maps of Gene.name to Gene.primaryIdentifier and Gene.description for utility purposes on widget
+        Map<String,String> genePrimaryIDMap = new LinkedHashMap<>();
+        Map<String,String> geneDescriptionMap = new LinkedHashMap<>();
 
         // query ALL the sources and load the ones with enough genes (more than two)
         PathQuery sourcesQuery = getSourcesQuery(model, bag);
@@ -134,10 +132,9 @@ public class HeatMapController extends TilesAction {
             List<ResultElement> unitRow = unitResult.next();
             String unit = (String) unitRow.get(0).getField();
 
-            // query samples and sample descriptions
-            List<String> samples = new LinkedList<>();
+            // query samples, using identifier as map key
+            List<String> sampleNames = new LinkedList<>();
             Map<String,String> sampleDescriptions = new LinkedHashMap<>();
-            Map<String,String> sampleNames = new LinkedHashMap<>();
             PathQuery samplesQuery = getSamplesQuery(model, source);
             ExportResultsIterator samplesResult;
             try {
@@ -151,16 +148,14 @@ public class HeatMapController extends TilesAction {
                 if (sampleRow==null || sampleRow.get(0)==null || sampleRow.get(0).getField()==null) {
                     throw new RuntimeException("Null row or row element 0 retrieving samples.");
                 }
-                String sample = (String) sampleRow.get(0).getField();
+                String sampleName = (String) sampleRow.get(0).getField();
                 String sampleDescription = (String) sampleRow.get(1).getField();
-                String sampleName = (String) sampleRow.get(2).getField();
-                samples.add(sample);
-                sampleDescriptions.put(sample, sampleDescription);
-                sampleNames.put(sample, sampleName);
+                sampleNames.add(sampleName);
+                sampleDescriptions.put(sampleName, sampleDescription);
             }
             
             // if no samples return an empty JSON string and bail - that's a bug!
-            if (samples.size()==0) {
+            if (sampleNames.size()==0) {
                 setErrorMessage(request, "No samples returned for source:"+source);
                 return null;
             }
@@ -176,22 +171,23 @@ public class HeatMapController extends TilesAction {
             }
             while (valuesResult.hasNext()) {
                 List<ResultElement> valueRow = valuesResult.next();
-                String genePrimaryID = (String) valueRow.get(0).getField(); // 0 ExpressionValue.feature.primaryIdentifier
-                String geneID = (String) valueRow.get(1).getField();        // 1 ExpressionValue.feature.name
-		Integer num = (Integer) valueRow.get(2).getField();         // 2 ExpressionValue.sample.num
-                String sample = (String) valueRow.get(3).getField();        // 3 ExpressionValue.sample.identifier
-		Double value = (Double) valueRow.get(4).getField();         // 4 ExpressionValue.value
-                ExprValue expValue = new ExprValue(sample, num, value, geneID);
-                if (!expressionValueMap.containsKey(geneID)) {
-                    // put the gene primary identifier into the map
-                    genePrimaryIDMap.put(geneID, genePrimaryID);
+                String genePrimaryID = (String) valueRow.get(0).getField();   // 0 ExpressionValue.feature.primaryIdentifier
+                String geneName = (String) valueRow.get(1).getField();        // 1 ExpressionValue.feature.name
+                String geneDescription = (String) valueRow.get(2).getField(); // 2 ExpressionValue.feature.description
+                String sampleName = (String) valueRow.get(3).getField();      // 3 ExpressionValue.sample.name
+		Double value = (Double) valueRow.get(4).getField();           // 4 ExpressionValue.value
+                ExprValue expValue = new ExprValue(sampleName, value, geneName);
+                if (!expressionValueMap.containsKey(geneName)) {
+                    // put the gene primary identifier and description into the maps
+                    genePrimaryIDMap.put(geneName, genePrimaryID);
+                    geneDescriptionMap.put(geneName, geneDescription);
                     // create a new list with space for n (size of samples) ExpressionValues
-                    List<ExprValue> expressionValueList = new ArrayList<>(Collections.nCopies(samples.size(), new ExprValue()));
-                    expressionValueList.set(samples.indexOf(sample), expValue);
-                    expressionValueMap.put(geneID, expressionValueList);
+                    List<ExprValue> expressionValueList = new ArrayList<>(Collections.nCopies(sampleNames.size(), new ExprValue()));
+                    expressionValueList.set(sampleNames.indexOf(sampleName), expValue);
+                    expressionValueMap.put(geneName, expressionValueList);
                 } else {
                     // gene already here, update the value of this sample
-                    expressionValueMap.get(geneID).set(samples.indexOf(sample), expValue);
+                    expressionValueMap.get(geneName).set(sampleNames.indexOf(sampleName), expValue);
                 }
             }
             
@@ -202,7 +198,7 @@ public class HeatMapController extends TilesAction {
             }
             
             // canvasXpress "smps" = genes
-            List<String> genes =  new ArrayList<>(expressionValueMap.keySet());
+            List<String> geneNames =  new ArrayList<>(expressionValueMap.keySet());
             
             // add to the source lists
             sources.add(source);
@@ -214,10 +210,10 @@ public class HeatMapController extends TilesAction {
             sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
             // canvasXpress "data" = double[samples][genes]
-            double[][] data = new double[samples.size()][genes.size()];
-            for (int j=0; j<genes.size(); j++) {
-                String gene = genes.get(j);
-                for (int i=0; i<samples.size(); i++) {
+            double[][] data = new double[sampleNames.size()][geneNames.size()];
+            for (int j=0; j<geneNames.size(); j++) {
+                String gene = geneNames.get(j);
+                for (int i=0; i<sampleNames.size(); i++) {
                     if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null) {
                         data[i][j] = (double) expressionValueMap.get(gene).get(i).value;
                     } else {
@@ -225,53 +221,15 @@ public class HeatMapController extends TilesAction {
                     }
                 }
             }
-                
-            // analysis: calculate the mean Pearson's correlation coefficient of each gene with each other gene
-            PearsonsCorrelation pCorr = new PearsonsCorrelation();
-            Mean mean = new Mean();
-            double[] meanCorr = new double[genes.size()];
-            for (int j=0; j<genes.size(); j++) {
-                String gene1 = genes.get(j);
-                double[] values1 = new double[samples.size()];
-                for (int i=0; i<samples.size(); i++) {
-                    if (expressionValueMap.get(gene1)!=null && expressionValueMap.get(gene1).get(i)!=null) {
-                        values1[i] = (double) expressionValueMap.get(gene1).get(i).value;
-                    }
-                }
-                double totalCorr = 0.0;
-                int count = 0;
-                for (int k=0; k<genes.size(); k++) {
-                    if (j!=k) {
-                        String gene2 = genes.get(k);
-                        double[] values2 = new double[samples.size()];
-                        for (int i=0; i<samples.size(); i++) {
-                            if (expressionValueMap.get(gene2)!=null && expressionValueMap.get(gene2).get(i)!=null) {
-                                values2[i] = (double) expressionValueMap.get(gene2).get(i).value;
-                            }
-                        }
-                        double corr = pCorr.correlation(values1, values2);
-                        if (!Double.isNaN(corr)) {
-                            count++;
-                            totalCorr += corr;
-                        }
-                    }
-                }
-                if (count>0) meanCorr[j] = totalCorr/count;
-            }             
                     
             // put the main heatmap data into a JSONObject for "y"
             Map<String, Object> yInHeatmapData = new LinkedHashMap<>();
-            yInHeatmapData.put("vars", samples);
-            yInHeatmapData.put("smps", genes);
+            yInHeatmapData.put("vars", sampleNames);
+            yInHeatmapData.put("smps", geneNames);
             yInHeatmapData.put("data", data);
-                    
-            // load analysis data into "x"
-            Map<String,Object> xInHeatmapData = new LinkedHashMap<>();
-            xInHeatmapData.put("PCorr", meanCorr);
                     
             // create the map that gets converted to the JSON object
             Map<String, Object> heatmapData = new LinkedHashMap<>();
-            heatmapData.put("x", xInHeatmapData);
             heatmapData.put("y", yInHeatmapData);
                     
             // convert to JSONObject and add to expressionJSON
@@ -280,24 +238,24 @@ public class HeatMapController extends TilesAction {
             // add the sample descriptions to the list
             descriptionsJSON.add(new JSONObject(sampleDescriptions).toString());
 
-            // add the sample names to the list
-            namesJSON.add(new JSONObject(sampleNames).toString());
-                    
             // add these results to the results maps
-            geneCounts.add(genes.size());
-            sampleCounts.add(samples.size());
+            geneCounts.add(geneNames.size());
+            sampleCounts.add(sampleNames.size());
         }
         
         // set the return attributes
-        request.setAttribute("errorMessage", "");
         request.setAttribute("sources", sources);
         request.setAttribute("genePrimaryIDMap", genePrimaryIDMap);
+        request.setAttribute("geneDescriptionMap", geneDescriptionMap);
         request.setAttribute("geneCounts", geneCounts);
         request.setAttribute("sampleCounts", sampleCounts);
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("expressionJSON", expressionJSON);
         request.setAttribute("descriptionsJSON", descriptionsJSON);
-        request.setAttribute("namesJSON", namesJSON);
+
+        // DEBUG
+        System.out.println(expressionJSON);
+        //<
         
         return null;
     }
@@ -343,11 +301,11 @@ public class HeatMapController extends TilesAction {
      */
     PathQuery getSamplesQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
-        query.addView("ExpressionSample.identifier");   // 0
-        query.addView("ExpressionSample.description");  // 1
-        query.addView("ExpressionSample.name");         // 2
+        query.addView("ExpressionSample.name");           // 0
+        query.addView("ExpressionSample.description");    // 1
         query.addConstraint(Constraints.eq("ExpressionSample.source.primaryIdentifier", source));
-        query.addOrderBy("ExpressionSample.num", OrderDirection.ASC);
+        query.addOrderBy("ExpressionSample.replicateGroup", OrderDirection.ASC);
+        query.addOrderBy("ExpressionSample.name", OrderDirection.ASC);
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Samples query invalid: "+verifyList);
         return query;
@@ -366,12 +324,13 @@ public class HeatMapController extends TilesAction {
         // Add views
         query.addView("ExpressionValue.feature.primaryIdentifier");   // 0
         query.addView("ExpressionValue.feature.name");                // 1
-	query.addView("ExpressionValue.sample.num");                  // 2
-	query.addView("ExpressionValue.sample.identifier");           // 3
+        query.addView("ExpressionValue.feature.description");         // 2
+	query.addView("ExpressionValue.sample.name");                 // 3
 	query.addView("ExpressionValue.value");                       // 4
         // Add orderby
 	query.addOrderBy("ExpressionValue.feature.name", OrderDirection.ASC);
-        query.addOrderBy("ExpressionValue.sample.num", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.replicateGroup", OrderDirection.ASC);
+        query.addOrderBy("ExpressionValue.sample.name", OrderDirection.ASC);
         // Add source and bag constraints
         query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
         query.addConstraint(Constraints.in("ExpressionValue.feature", bag.getName()));
@@ -439,14 +398,12 @@ public class HeatMapController extends TilesAction {
      */
     private class ExprValue {
         String sample;
-        int num;
         double value;
         String featureId;
         ExprValue() {
         }
-        ExprValue(String sample, int num, double value, String featureId) {
+        ExprValue(String sample, double value, String featureId) {
             this.sample = sample;
-            this.num = num;
             this.value = value;
             this.featureId = featureId;
         }
