@@ -50,8 +50,6 @@ import org.json.JSONObject;
 /**
  * Class that generates CanvasXpress heat map data for a list of genes.
  *
- * Originally based on the modmine HeatMapController written by Sergio and Fengyuan Hu, but heavily modified.
- *
  * @author Sam Hokin
  *
  */
@@ -91,8 +89,6 @@ public class HeatMapController extends TilesAction {
         List<String> expressionJSON = new LinkedList<>();
         List<String> descriptionsJSON = new LinkedList<>();
         List<String> namesJSON = new LinkedList<>();
-        List<Integer> geneCounts = new LinkedList<>();
-        List<Integer> sampleCounts = new LinkedList<>();
 
         // store a maps of Gene.name to Gene.primaryIdentifier and Gene.description for utility purposes on widget
         Map<String,String> genePrimaryIDMap = new LinkedHashMap<>();
@@ -132,7 +128,7 @@ public class HeatMapController extends TilesAction {
             List<ResultElement> unitRow = unitResult.next();
             String unit = (String) unitRow.get(0).getField();
 
-            // query samples, using identifier as map key
+            // query samples, using name as map key for descriptions
             List<String> sampleNames = new LinkedList<>();
             Map<String,String> sampleDescriptions = new LinkedHashMap<>();
             PathQuery samplesQuery = getSamplesQuery(model, source);
@@ -197,7 +193,7 @@ public class HeatMapController extends TilesAction {
                 return null;
             }
             
-            // canvasXpress "smps" = genes
+            // canvasXpress "vars" = genes
             List<String> geneNames =  new ArrayList<>(expressionValueMap.keySet());
             
             // add to the source lists
@@ -207,15 +203,18 @@ public class HeatMapController extends TilesAction {
             jsonMap.put("primaryIdentifier", source);
             jsonMap.put("synopsis", synopsis);
             jsonMap.put("unit", unit);
+            jsonMap.put("sampleCount", sampleNames.size());
+            jsonMap.put("geneCount", geneNames.size());
             sourcesJSON.add(new JSONObject(jsonMap).toString());
                 
-            // canvasXpress "data" = double[samples][genes]
-            double[][] data = new double[sampleNames.size()][geneNames.size()];
-            for (int j=0; j<geneNames.size(); j++) {
-                String gene = geneNames.get(j);
-                for (int i=0; i<sampleNames.size(); i++) {
-                    if (expressionValueMap.get(gene)!=null && expressionValueMap.get(gene).get(i)!=null) {
-                        data[i][j] = (double) expressionValueMap.get(gene).get(i).value;
+            // canvasXpress "data" = double[genes][samples]
+            double[][] data = new double[geneNames.size()][sampleNames.size()];
+            for (int j=0; j<sampleNames.size(); j++) {
+                String sampleName = sampleNames.get(j);
+                for (int i=0; i<geneNames.size(); i++) {
+                    String geneName = geneNames.get(i);
+                    if (expressionValueMap.get(geneName)!=null && expressionValueMap.get(geneName).get(j)!=null) {
+                        data[i][j] = (double) expressionValueMap.get(geneName).get(j).value;
                     } else {
                         data[i][j] = 0.0;
                     }
@@ -224,8 +223,8 @@ public class HeatMapController extends TilesAction {
                     
             // put the main heatmap data into a JSONObject for "y"
             Map<String, Object> yInHeatmapData = new LinkedHashMap<>();
-            yInHeatmapData.put("vars", sampleNames);
-            yInHeatmapData.put("smps", geneNames);
+            yInHeatmapData.put("smps", sampleNames);
+            yInHeatmapData.put("vars", geneNames);
             yInHeatmapData.put("data", data);
                     
             // create the map that gets converted to the JSON object
@@ -237,25 +236,16 @@ public class HeatMapController extends TilesAction {
                     
             // add the sample descriptions to the list
             descriptionsJSON.add(new JSONObject(sampleDescriptions).toString());
-
-            // add these results to the results maps
-            geneCounts.add(geneNames.size());
-            sampleCounts.add(sampleNames.size());
         }
         
-        // set the return attributes
+        // non-JSON objects
         request.setAttribute("sources", sources);
         request.setAttribute("genePrimaryIDMap", genePrimaryIDMap);
         request.setAttribute("geneDescriptionMap", geneDescriptionMap);
-        request.setAttribute("geneCounts", geneCounts);
-        request.setAttribute("sampleCounts", sampleCounts);
+        // lists of JSON strings
         request.setAttribute("sourcesJSON", sourcesJSON);
         request.setAttribute("expressionJSON", expressionJSON);
         request.setAttribute("descriptionsJSON", descriptionsJSON);
-
-        // DEBUG
-        System.out.println(expressionJSON);
-        //<
         
         return null;
     }
@@ -366,8 +356,6 @@ public class HeatMapController extends TilesAction {
     void setEmptyRequestAttributes(HttpServletRequest request) {
         request.setAttribute("sources", null);
         request.setAttribute("sourcesJSON", null);
-        request.setAttribute("geneCounts", null);
-        request.setAttribute("sampleCounts", null);
         request.setAttribute("expressionJSON", "{}");
         request.setAttribute("descriptionsJSON", "{}");
     }
