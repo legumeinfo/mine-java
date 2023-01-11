@@ -331,7 +331,7 @@ public class HeatMapController extends TilesAction {
     }
 
     /**
-     * Create a path query to retrieve the expression unit from ExpressionValue.
+     * Create a path query to retrieve the expression unit from ExpressionSource.
      *
      * @param model  the model
      * @param source the primaryIdentifier of the ExpressionSource
@@ -340,9 +340,9 @@ public class HeatMapController extends TilesAction {
     PathQuery getExpressionUnitQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
         // Add views
-        query.addView("ExpressionValue.unit"); // 0
-        // Add source and bag constraints
-        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
+        query.addView("ExpressionSource.unit"); // 0
+        // constraint
+        query.addConstraint(Constraints.eq("ExpressionSource.primaryIdentifier", source));
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Expression unit query invalid: "+verifyList);
         return query;
