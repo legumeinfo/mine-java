@@ -171,7 +171,7 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
             while (valuesResult.hasNext()) {
                 List<ResultElement> row = valuesResult.next();
                 Integer num = (Integer) row.get(0).getField();        // 0 Gene.expressionValues.sample.num
-                String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.identifier
+                String sample = (String) row.get(1).getField();       // 1 Gene.expressionValues.sample.primaryIdentifier
                 Double value = (Double) row.get(2).getField();        // 2 Gene.expressionValues.value
                 ExprValue eval = new ExprValue(sample, num, value, geneID);
                 exprValues.add(eval);
@@ -249,8 +249,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve the sample identifier = ExpressionSample.name.
+     * Create a path query to retrieve the ExpressionSample.name.
      *
+     * <attribute name="primaryIdentifier" type="java.lang.String"/>
      * <attribute name="name" type="java.lang.String"/>
      * <attribute name="description" type="java.lang.String"/>
      * <attribute name="tissue" type="java.lang.String"/>
@@ -259,7 +260,6 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
      * <attribute name="replicateGroup" type="java.lang.String"/>
      *
      * <attribute name="num" type="java.lang.Integer"/>
-     * <attribute name="identifier" type="java.lang.String"/>
      * <attribute name="bioSample" type="java.lang.String"/>
      * <attribute name="sraExperiment" type="java.lang.String"/>
      * <attribute name="species" type="java.lang.String"/>
@@ -285,18 +285,18 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
     }
 
     /**
-     * Create a path query to retrieve the expression unit from ExpressionValue.
+     * Create a path query to retrieve the expression unit from ExpressionSource.
      *
      * @param model  the model
-     * @param source the identifier of the ExpressionSource
+     * @param source the primaryIdentifier of the ExpressionSource
      * @return the path query
      */
     PathQuery getExpressionUnitQuery(Model model, String source) {
         PathQuery query = new PathQuery(model);
         // Add views
-        query.addView("ExpressionValue.unit"); // 0
-        // Add source and bag constraints
-        query.addConstraint(Constraints.eq("ExpressionValue.sample.source.primaryIdentifier", source));
+        query.addView("ExpressionSource.unit"); // 0
+        // Add source constraint
+        query.addConstraint(Constraints.eq("ExpressionSource.primaryIdentifier", source));
         List<String> verifyList = query.verifyQuery();
         if (!verifyList.isEmpty()) throw new RuntimeException("Expression unit query invalid: "+verifyList);
         return query;
@@ -314,9 +314,9 @@ public class GeneBarchartDisplayer extends ReportDisplayer {
         PathQuery query = new PathQuery(model);
         // Add views
         query.addViews(
-                       "ExpressionValue.sample.num",         // 0
-                       "ExpressionValue.sample.identifier",  // 1
-                       "ExpressionValue.value"               // 2
+                       "ExpressionValue.sample.num",                // 0
+                       "ExpressionValue.sample.primaryIdentifier",  // 1
+                       "ExpressionValue.value"                      // 2
                        );
         // Add orderby
         query.addOrderBy("ExpressionValue.sample.replicateGroup", OrderDirection.ASC);
