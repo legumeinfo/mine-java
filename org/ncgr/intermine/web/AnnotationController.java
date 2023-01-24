@@ -91,9 +91,9 @@ public class AnnotationController extends TilesAction {
             sequenceType = "n";
             query.addView("MRNA.primaryIdentifier");           // 0
             query.addView("MRNA.sequence.residues");           // 1
-            query.addView("MRNA.gene.geneFamily.primaryIdentifier");  // 2
-            query.addView("MRNA.gene.geneFamily.description"); // 3
-            query.addOrderBy("MRNA.gene.geneFamily.primaryIdentifier", OrderDirection.ASC);
+            query.addView("MRNA.gene.geneFamilyAssignments.geneFamily.primaryIdentifier");  // 2
+            query.addView("MRNA.gene.geneFamilyAssignments.geneFamily.description"); // 3
+            query.addOrderBy("MRNA.gene.geneFamilyAssignments.geneFamily.primaryIdentifier", OrderDirection.ASC);
             query.addOrderBy("MRNA.primaryIdentifier", OrderDirection.ASC);
             query.addConstraint(Constraints.in("MRNA", bag.getName()));
         } else if (bagType.equals("Transcript")) {
