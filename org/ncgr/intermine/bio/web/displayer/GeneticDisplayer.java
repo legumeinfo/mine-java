@@ -123,7 +123,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
             double[] length = new double[2];
             length[0] = 0.0;
             List<ResultElement> lgRow = lgMap.get(lgId);
-            String lgIdentifier = (String) lgRow.get(1).getField();  // 1:LinkageGroup.identifier
+            String lgName = (String) lgRow.get(1).getField();  // 1:LinkageGroup.name
             length[1] = (double) (Double) lgRow.get(2).getField();   // 2:LinkageGroup.length
             // determine max LG length for plotting purposes
             if (length[1]>maxLGLength) maxLGLength = length[1];
@@ -134,7 +134,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
             List<Object> lgDataArray = new LinkedList<Object>();
             // the single data item
             Map<String,Object> lgData = new LinkedHashMap<String,Object>();
-            lgData.put("id", lgIdentifier);
+            lgData.put("id", lgName);
             lgData.put("key", lgId); // for linking
             lgData.put("fill", "purple");
             lgData.put("outline", "black");
@@ -179,12 +179,12 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
                     // the data
                     double[] span = new double[2];
                     List<ResultElement> qtlRow = qtls.get(qtlId);
-                    String qtlIdentifier = (String) qtlRow.get(1).getField(); // 1:QTL.identifier
-                    span[0] = (double) (Double) qtlRow.get(2).getField();     // 2:QTL.start
-                    span[1] = (double) (Double) qtlRow.get(3).getField();     // 3:QTL.end
+                    String qtlName = (String) qtlRow.get(1).getField();    // 1:QTL.name
+                    span[0] = (double) (Double) qtlRow.get(2).getField();  // 2:QTL.start
+                    span[1] = (double) (Double) qtlRow.get(3).getField();  // 3:QTL.end
                     // the track data
                     Map<String,Object> qtlData = new LinkedHashMap<String,Object>();
-                    qtlData.put("id", qtlIdentifier); // canvasXpress needs it to be called "id"
+                    qtlData.put("id", qtlName); // canvasXpress needs it to be called "id"
                     qtlData.put("key", qtlId); // for linking
                     qtlData.put("fill", "yellow");
                     qtlData.put("outline", "black");
@@ -215,7 +215,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
      * Return a path query to retrieve linkage groups associated with this report.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.identifier
+     * 1:LinkageGroup.name
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -242,7 +242,7 @@ public abstract class GeneticDisplayer extends ReportDisplayer {
      * Return a path query to retrieve QTLs associated with a given linkage group.
      *
      * 0:QTL.id
-     * 1:QTL.identifier
+     * 1:QTL.name
      * 2:QTL.start
      * 3:QTL.end
      *
