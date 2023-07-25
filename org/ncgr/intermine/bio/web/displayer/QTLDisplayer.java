@@ -42,7 +42,7 @@ public class QTLDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve the linkage group associated with this QTL.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.identifier
+     * 1:LinkageGroup.name
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -53,7 +53,7 @@ public class QTLDisplayer extends GeneticDisplayer {
     PathQuery getLinkageGroupQuery(Model model, int reportId) {
         PathQuery query = new PathQuery(model);
         query.addViews("QTL.linkageGroup.id",
-                       "QTL.linkageGroup.identifier",
+                       "QTL.linkageGroup.name",
                        "QTL.linkageGroup.length");
         query.addConstraint(Constraints.eq("QTL.id", String.valueOf(reportId)));
         return query;
@@ -63,7 +63,7 @@ public class QTLDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve this QTL.
      *
      * 0:QTL.id
-     * 1:QTL.identifier
+     * 1:QTL.name
      * 2:QTL.start
      * 3:QTL.end
      *
@@ -75,10 +75,10 @@ public class QTLDisplayer extends GeneticDisplayer {
     @Override
     PathQuery getQTLQuery(Model model, int lgId, int reportId) {
         PathQuery query = new PathQuery(model);
-        query.addViews("QTL.id",                  // 0
-                       "QTL.identifier",          // 1
-                       "QTL.start",               // 2
-                       "QTL.end");                // 3
+        query.addViews("QTL.id",            // 0
+                       "QTL.name",          // 1
+                       "QTL.start",         // 2
+                       "QTL.end");          // 3
         query.addConstraint(Constraints.eq("QTL.id", String.valueOf(reportId)));
         return query;
     }

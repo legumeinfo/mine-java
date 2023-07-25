@@ -42,7 +42,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve the linkage groups associated with this QTLStudy.
      *
      * 0:LinkageGroup.id
-     * 1:LinkageGroup.identifier
+     * 1:LinkageGroup.name
      * 2:LinkageGroup.length
      *
      * @param model the model
@@ -53,7 +53,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
     PathQuery getLinkageGroupQuery(Model model, int reportId) {
         PathQuery query = new PathQuery(model);
         query.addViews("QTLStudy.qtls.linkageGroup.id",
-                       "QTLStudy.qtls.linkageGroup.identifier",
+                       "QTLStudy.qtls.linkageGroup.name",
                        "QTLStudy.qtls.linkageGroup.length");
         query.addConstraint(Constraints.eq("QTLStudy.id", String.valueOf(reportId)));
         query.addOrderBy("QTLStudy.qtls.linkageGroup.number", OrderDirection.ASC);
@@ -64,7 +64,7 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
      * Return a path query to retrieve the QTLs in this QTLStudy on the given LinkageGroup.
      *
      * 0:QTL.id
-     * 1:QTL.identifier
+     * 1:QTL.name
      * 2:QTL.start
      * 3:QTL.end
      *
@@ -76,10 +76,10 @@ public class QTLStudyDisplayer extends GeneticDisplayer {
     @Override
     PathQuery getQTLQuery(Model model, int lgId, int reportId) {
         PathQuery query = new PathQuery(model);
-        query.addViews("QTLStudy.qtls.id",           // 0
-                       "QTLStudy.qtls.identifier",   // 1
-                       "QTLStudy.qtls.start",        // 2
-                       "QTLStudy.qtls.end");         // 3
+        query.addViews("QTLStudy.qtls.id",     // 0
+                       "QTLStudy.qtls.name",   // 1
+                       "QTLStudy.qtls.start",  // 2
+                       "QTLStudy.qtls.end");   // 3
         query.addConstraint(Constraints.eq("QTLStudy.id", String.valueOf(reportId)));
         query.addConstraint(Constraints.eq("QTLStudy.qtls.linkageGroup.id", String.valueOf(lgId)));
         query.addOrderBy("QTLStudy.qtls.start", OrderDirection.ASC);
