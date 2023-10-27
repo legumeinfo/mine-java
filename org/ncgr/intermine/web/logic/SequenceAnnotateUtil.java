@@ -95,8 +95,6 @@ public class SequenceAnnotateUtil {
                 } else {
                     System.err.println("## bioSequence is null for object.");
                 }
-            } else {
-                System.err.println("## No gene family identifiers found for object.");
             }
         }
     }
