@@ -45,7 +45,7 @@ import org.intermine.web.logic.session.SessionMethods;
 import org.json.JSONObject;
 
 /**
- * Class that generates ANNOTATE button data on a list of CDSes, Transcripts/MRNAs, or Proteins.
+ * Class that generates ANNOTATE button data on a list of Transcripts/MRNAs, or Proteins.
  *
  * @author Sam Hokin
  */
@@ -65,9 +65,9 @@ public class AnnotationController extends TilesAction {
         Profile profile = SessionMethods.getProfile(session);
         PathQueryExecutor executor = im.getPathQueryExecutor(profile);
 
-        // check that we've got a list of CDSes, Transcripts, MRNAs, or Proteins
+        // check that we've got a list of Transcripts, MRNAs, or Proteins
         String bagType = bag.getType();
-        if (!bagType.equals("CDS") && !bagType.equals("Transcript") && !bagType.equals("MRNA") && !bagType.equals("Protein")) {
+        if (!bagType.equals("Transcript") && !bagType.equals("MRNA") && !bagType.equals("Protein")) {
             String errorMessage = "ERROR: AnnotationController called on a bag of type "+bagType+".";
             request.setAttribute("errorMessage", errorMessage);
             throw new RuntimeException(errorMessage);
@@ -76,17 +76,7 @@ public class AnnotationController extends TilesAction {
         // for the bagType-dependent query
         PathQuery query = new PathQuery(model);
         String sequenceType = null;
-        if (bagType.equals("CDS")) {
-            // CDS
-            sequenceType = "n";
-            query.addView("CDS.primaryIdentifier");           // 0
-            query.addView("CDS.sequence.residues");           // 1
-            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.primaryIdentifier");  // 2
-            query.addView("CDS.gene.geneFamilyAssignments.geneFamily.description"); // 3
-            query.addOrderBy("CDS.gene.geneFamilyAssignments.geneFamily.primaryIdentifier", OrderDirection.ASC);
-            query.addOrderBy("CDS.primaryIdentifier", OrderDirection.ASC);
-            query.addConstraint(Constraints.in("CDS", bag.getName()));
-        } else if (bagType.equals("MRNA")) {
+        if (bagType.equals("MRNA")) {
             // MRNA
             sequenceType = "n";
             query.addView("MRNA.primaryIdentifier");           // 0

@@ -21,7 +21,6 @@ import org.intermine.bio.web.biojava.BioSequenceFactory.SequenceType;
 import org.intermine.bio.web.export.ResidueFieldExporter;
 import org.intermine.model.InterMineObject;
 import org.intermine.model.bio.BioEntity;
-import org.intermine.model.bio.CDS;
 import org.intermine.model.bio.GeneFamilyAssignment;
 import org.intermine.model.bio.Protein;
 import org.intermine.model.bio.Sequence;
@@ -44,7 +43,6 @@ public class SequenceAnnotateUtil {
     private static final String PROPERTY_DESCRIPTIONLINE = "description_line";
 
     private BioSequence bioSequence;
-    private String method;
     private String identifier;
     private String objClass;
     private String sequenceType;
@@ -68,8 +66,8 @@ public class SequenceAnnotateUtil {
         List<String> objStrings = new LinkedList<>(obj.getoBJECT().getStrings());
         objClass = objStrings.get(0).substring(27);
 
-        // limit to CDS, Transcript/MRNA, Protein
-        if (objClass.equals("CDS") || objClass.equals("Transcript") || objClass.equals("MRNA") || objClass.equals("Protein")) {
+        // limit to Transcript/MRNA, Protein
+        if (objClass.equals("Transcript") || objClass.equals("MRNA") || objClass.equals("Protein")) {
             if (objClass.equals("Protein")) {
                 Protein protein = (Protein) obj;
                 Set <GeneFamilyAssignment> gfas = protein.getGeneFamilyAssignments();
@@ -77,10 +75,6 @@ public class SequenceAnnotateUtil {
             } else if (objClass.equals("Transcript") || objClass.equals("MRNA")) {
                 Transcript transcript = (Transcript) obj;
                 Set <GeneFamilyAssignment> gfas = transcript.getGene().getGeneFamilyAssignments();
-                for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getPrimaryIdentifier());
-            } else if (objClass.equals("CDS")) {
-                CDS cds = (CDS) obj;
-                Set <GeneFamilyAssignment> gfas = cds.getGene().getGeneFamilyAssignments();
                 for (GeneFamilyAssignment gfa : gfas) geneFamilyIdentifiers.add(gfa.getGeneFamily().getPrimaryIdentifier());
             }
             if (geneFamilyIdentifiers.size()>0) {
@@ -93,7 +87,7 @@ public class SequenceAnnotateUtil {
                     }
                     bioSequence.setAccession(new AccessionID((String) obj.getFieldValue("primaryIdentifier")));
                 } else {
-                    System.err.println("## bioSequence is null for object.");
+                    System.err.println("## bioSequence is null for object:" + obj.getFieldValue("primaryIdentifier"));
                 }
             }
         }
